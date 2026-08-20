@@ -12,6 +12,9 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.MaxAttemptsRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -27,6 +30,7 @@ public class StatClientImpl implements StatClient {
     private final String app;
     private final RestClient restClient;
     private final DiscoveryClient discoveryClient;
+    private final RetryTemplate retryTemplate;
     private final String statsServiceName;
 
     public StatClientImpl(String app, int timeoutMs, String statsServiceName, DiscoveryClient discoveryClient) {
@@ -44,6 +48,7 @@ public class StatClientImpl implements StatClient {
 
         this.discoveryClient = discoveryClient;
         this.statsServiceName = statsServiceName;
+        this.retryTemplate = createRetryTemplate();
     }
 
     @Override
@@ -51,7 +56,7 @@ public class StatClientImpl implements StatClient {
         HitDto dto = HitMapper.fromHitParams(params, app);
 
         URI uri = UriComponentsBuilder
-                .fromUri(getInstance().getUri())
+                .fromUri(getInstanceWithRetry().getUri())
                 .path("/hit")
                 .build()
                 .toUri();
@@ -97,7 +102,7 @@ public class StatClientImpl implements StatClient {
 
     private String buildStatsPath(GetStatsParams params) {
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromUri(getInstance().getUri())
+                .fromUri(getInstanceWithRetry().getUri())
                 .path("/stats");
 
         LocalDateTime start = params.getStart();
@@ -121,6 +126,24 @@ public class StatClientImpl implements StatClient {
         }
 
         return builder.build().toUriString();
+    }
+
+    private RetryTemplate createRetryTemplate() {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+        fixedBackOffPolicy.setBackOffPeriod(3000L);
+        retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
+
+        MaxAttemptsRetryPolicy retryPolicy = new MaxAttemptsRetryPolicy();
+        retryPolicy.setMaxAttempts(3);
+        retryTemplate.setRetryPolicy(retryPolicy);
+
+        return retryTemplate;
+    }
+
+    private ServiceInstance getInstanceWithRetry() {
+        return retryTemplate.execute(cxt -> getInstance());
     }
 
     private ServiceInstance getInstance() {
