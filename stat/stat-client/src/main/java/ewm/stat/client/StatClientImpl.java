@@ -1,11 +1,14 @@
 package ewm.stat.client;
 
 import ewm.stat.client.exception.StatClientException;
+import ewm.stat.client.exception.StatsServerUnavailableException;
 import ewm.stat.client.model.GetStatsParams;
 import ewm.stat.client.model.HitParams;
 import ewm.stat.dto.HitDto;
 import ewm.stat.client.mapper.HitMapper;
 import ewm.stat.dto.StatDto;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -14,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -22,8 +26,10 @@ public class StatClientImpl implements StatClient {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final String app;
     private final RestClient restClient;
+    private final DiscoveryClient discoveryClient;
+    private final String statsServiceName;
 
-    public StatClientImpl(String app, String baseUrl, int timeoutMs) {
+    public StatClientImpl(String app, int timeoutMs, String statsServiceName, DiscoveryClient discoveryClient) {
         this.app = app;
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -33,18 +39,26 @@ public class StatClientImpl implements StatClient {
         }
 
         this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
                 .build();
+
+        this.discoveryClient = discoveryClient;
+        this.statsServiceName = statsServiceName;
     }
 
     @Override
     public void saveHit(HitParams params) {
         HitDto dto = HitMapper.fromHitParams(params, app);
 
+        URI uri = UriComponentsBuilder
+                .fromUri(getInstance().getUri())
+                .path("/hit")
+                .build()
+                .toUri();
+
         try {
             restClient.post()
-                    .uri("/hit")
+                    .uri(uri)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(dto)
                     .retrieve()
@@ -82,7 +96,10 @@ public class StatClientImpl implements StatClient {
     }
 
     private String buildStatsPath(GetStatsParams params) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/stats");
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUri(getInstance().getUri())
+                .path("/stats");
+
         LocalDateTime start = params.getStart();
         LocalDateTime end = params.getEnd();
 
@@ -104,5 +121,18 @@ public class StatClientImpl implements StatClient {
         }
 
         return builder.build().toUriString();
+    }
+
+    private ServiceInstance getInstance() {
+        try {
+            return discoveryClient
+                    .getInstances(statsServiceName)
+                    .getFirst();
+        } catch (Exception exception) {
+            throw new StatsServerUnavailableException(
+                    "Error detecting address of stats-server application with id: " + statsServiceName,
+                    exception
+            );
+        }
     }
 }

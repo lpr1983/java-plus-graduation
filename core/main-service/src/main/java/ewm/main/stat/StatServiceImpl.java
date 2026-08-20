@@ -2,6 +2,7 @@ package ewm.main.stat;
 
 import ewm.stat.client.StatClient;
 import ewm.stat.client.exception.StatClientException;
+import ewm.stat.client.exception.StatsServerUnavailableException;
 import ewm.stat.client.model.GetStatsParams;
 import ewm.stat.client.model.HitParams;
 import ewm.stat.dto.StatDto;
@@ -33,7 +34,7 @@ public class StatServiceImpl implements StatService {
 
         try {
             statClient.saveHit(params);
-        } catch (StatClientException e) {
+        } catch (StatClientException | StatsServerUnavailableException e) {
             log.error("Ошибка работы statClient.saveHit: {}", e.getMessage());
         }
     }
@@ -43,7 +44,7 @@ public class StatServiceImpl implements StatService {
         try {
             List<StatDto> statResult = statClient.getStats(params);
             return toViewsByUri(statResult);
-        } catch (StatClientException e) {
+        } catch (StatClientException | StatsServerUnavailableException e) {
             log.error("Ошибка работы statClient.getStats: {}", e.getMessage());
             return null;
         }
