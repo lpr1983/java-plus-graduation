@@ -12,8 +12,9 @@
 
     <name>Explore With Me</name>
     <modules>
-        <module>main-service</module>
         <module>stat</module>
+        <module>core</module>
+        <module>infra</module>
     </modules>
 
     <groupId>ru.practicum</groupId>
@@ -24,6 +25,8 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-cloud-dependencies.version>2023.0.3</spring-cloud-dependencies.version>
+        <kafka-clients.version>3.6.1</kafka-clients.version>
     </properties>
 
     <dependencies>
@@ -33,6 +36,23 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>${kafka-clients.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud-dependencies.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <pluginManagement>
