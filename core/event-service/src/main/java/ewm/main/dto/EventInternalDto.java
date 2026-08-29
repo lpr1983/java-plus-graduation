@@ -1,0 +1,18 @@
+package ewm.main.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class EventInternalDto {
+    private Long id;
+    private Long initiatorId;
+    private String state;
+    private int participantLimit;
+    private boolean requestModeration;
+}
