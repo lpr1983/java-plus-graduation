@@ -24,6 +24,11 @@ public class UserService {
         return userRepository.findAllById(ids);
     }
 
+    public User findUserById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User с таким id не найден"));
+    }
+
     public List<User> findAllUsers(int from, int size) {
         Pageable pageable = PageRequest.of(from / size, size);
         // from-количество пропускаемых в начале списка элементов
