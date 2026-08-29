@@ -11,8 +11,8 @@ import ewm.main.event.repository.EventRepository;
 import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.NotFoundException;
 import ewm.main.exception.ValidationException;
-import ewm.main.place.Place;
-import ewm.main.place.repository.PlaceRepository;
+import ewm.main.location.LocationClient;
+import feign.FeignException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +31,7 @@ import java.util.List;
 public class PublicEventServiceImpl implements PublicEventService {
     private final EventRepository eventRepository;
     private final EventDtoAssembler eventDtoAssembler;
-    private final PlaceRepository placeRepository;
+    private final LocationClient locationClient;
 
     @Override
     public List<EventShortDto> getEvents(PublicEventSearchParam searchParam, PageParam pageParam) {
@@ -60,15 +60,10 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .and(EventSpecifications.paid(searchParam.getPaid()))
                 .and(EventSpecifications.categoryIdIn(searchParam.getCategories()));
 
-        Long placeId = searchParam.getPlaceId();
-        Place place = null;
-
-        if (placeId != null) {
-            place = placeRepository.findById(placeId)
-                    .orElseThrow(() -> new NotFoundException("Не найдено место с id: " + placeId));
-        }
-
-        specification = specification.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
+        specification = specification.and(getLocationSpecification(
+                searchParam.getPlaceId(),
+                searchParam.getRadius()
+        ));
 
         EventSort eventSort = EventSort.parse(searchParam.getSort());
 
@@ -115,6 +110,22 @@ public class PublicEventServiceImpl implements PublicEventService {
                         Comparator.nullsLast(Comparator.reverseOrder())
                 )
                 .thenComparing(EventShortDto::getId);
+    }
+
+    private Specification<Event> getLocationSpecification(Long placeId, Double radius) {
+        if (radius != null && placeId == null) {
+            throw new ValidationException("Нельзя указывать радиус без указания места");
+        }
+
+        if (placeId == null) {
+            return null;
+        }
+
+        try {
+            return EventSpecifications.idIn(locationClient.findEventIds(placeId, radius));
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найдено место с id: " + placeId);
+        }
     }
 
     @Override

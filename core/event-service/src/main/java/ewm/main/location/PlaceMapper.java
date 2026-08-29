@@ -1,11 +1,14 @@
-package ewm.main.place.mapper;
+package ewm.main.location;
 
+import ewm.main.dto.PlaceInternalDto;
 import ewm.main.dto.ShortPlaceDto;
-import ewm.main.place.Place;
 
-public class PlaceMapper {
+public final class PlaceMapper {
 
-    public static ShortPlaceDto toShortDto(Place place) {
+    private PlaceMapper() {
+    }
+
+    public static ShortPlaceDto toShortDto(PlaceInternalDto place) {
         if (place == null) {
             return null;
         }

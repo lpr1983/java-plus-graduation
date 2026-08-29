@@ -1,4 +1,4 @@
-$services = 'discovery-server|config-server|stats-server|user-service|request-service|event-service|gateway-server'
+$services = 'discovery-server|config-server|stats-server|user-service|request-service|location-service|event-service|gateway-server'
 
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
     Where-Object {

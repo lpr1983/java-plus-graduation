@@ -1,12 +1,17 @@
 package ewm.main.event.service;
 
 import ewm.main.dto.ConfirmedRequestsCountDto;
+import ewm.main.dto.EventLocationInternalDto;
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.EventShortDto;
+import ewm.main.dto.LocationDto;
+import ewm.main.dto.ShortPlaceDto;
 import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
 import ewm.main.exception.NotFoundException;
+import ewm.main.location.LocationClient;
+import ewm.main.location.PlaceMapper;
 import ewm.main.request.RequestClient;
 import ewm.main.stat.StatService;
 import ewm.main.user.UserClient;
@@ -29,13 +34,16 @@ public class EventDtoAssembler {
     private final StatService statService;
     private final RequestClient requestClient;
     private final UserClient userClient;
+    private final LocationClient locationClient;
 
     public EventDtoAssembler(StatService statService,
                              RequestClient requestClient,
-                             UserClient userClient) {
+                             UserClient userClient,
+                             LocationClient locationClient) {
         this.statService = statService;
         this.requestClient = requestClient;
         this.userClient = userClient;
+        this.locationClient = locationClient;
     }
 
     public EventShortDto toShortDto(Event event) {
@@ -48,7 +56,13 @@ public class EventDtoAssembler {
     }
 
     public EventFullDto toFullDto(Event event) {
-        EventFullDto dto = EventMapper.toFullDto(event, getInitiator(event));
+        EventLocationInternalDto eventLocation = getEventLocation(event);
+        EventFullDto dto = EventMapper.toFullDto(
+                event,
+                getInitiator(event),
+                toLocationDto(eventLocation),
+                toPlaceDto(eventLocation)
+        );
 
         dto.setViews(getViews(event));
         dto.setConfirmedRequests(getConfirmedRequests(event));
@@ -77,17 +91,68 @@ public class EventDtoAssembler {
         Map<Long, Long> viewsByEventId = getViewsByEventId(events);
         Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(events);
         Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events);
+        Map<Long, EventLocationInternalDto> locationsByEventId = getLocationsByEventId(events);
 
         List<EventFullDto> result = new ArrayList<>();
 
         for (Event event : events) {
-            EventFullDto dto = EventMapper.toFullDto(event, getInitiatorFromCache(event, initiatorsById));
+            EventLocationInternalDto eventLocation = getLocationFromCache(event, locationsByEventId);
+            EventFullDto dto = EventMapper.toFullDto(
+                    event,
+                    getInitiatorFromCache(event, initiatorsById),
+                    toLocationDto(eventLocation),
+                    toPlaceDto(eventLocation)
+            );
             dto.setViews(getViewsForEvent(event, viewsByEventId));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
             result.add(dto);
         }
 
         return result;
+    }
+
+    private EventLocationInternalDto getEventLocation(Event event) {
+        try {
+            return locationClient.getLocation(event.getId());
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найдены координаты события с id: " + event.getId());
+        }
+    }
+
+    private EventLocationInternalDto getLocationFromCache(
+            Event event,
+            Map<Long, EventLocationInternalDto> locationsByEventId) {
+        EventLocationInternalDto eventLocation = locationsByEventId.get(event.getId());
+        if (eventLocation == null) {
+            throw new NotFoundException("Не найдены координаты события с id: " + event.getId());
+        }
+        return eventLocation;
+    }
+
+    private Map<Long, EventLocationInternalDto> getLocationsByEventId(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        List<EventLocationInternalDto> eventLocations = locationClient.getLocations(getEventIds(events));
+        Map<Long, EventLocationInternalDto> result = new HashMap<>();
+
+        for (EventLocationInternalDto eventLocation : eventLocations) {
+            result.put(eventLocation.getEventId(), eventLocation);
+        }
+
+        return result;
+    }
+
+    private LocationDto toLocationDto(EventLocationInternalDto eventLocation) {
+        return LocationDto.builder()
+                .lat(eventLocation.getLat())
+                .lon(eventLocation.getLon())
+                .build();
+    }
+
+    private ShortPlaceDto toPlaceDto(EventLocationInternalDto eventLocation) {
+        return eventLocation.getPlace() == null ? null : PlaceMapper.toShortDto(eventLocation.getPlace());
     }
 
     private UserShortDto getInitiator(Event event) {

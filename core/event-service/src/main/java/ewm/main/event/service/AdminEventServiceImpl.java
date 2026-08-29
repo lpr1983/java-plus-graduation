@@ -14,8 +14,9 @@ import ewm.main.event.repository.EventRepository;
 import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.ConflictException;
 import ewm.main.exception.NotFoundException;
-import ewm.main.place.Place;
-import ewm.main.place.repository.PlaceRepository;
+import ewm.main.exception.ValidationException;
+import ewm.main.location.LocationClient;
+import feign.FeignException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -34,7 +35,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
     private final EventDtoAssembler eventDtoAssembler;
-    private final PlaceRepository placeRepository;
+    private final LocationClient locationClient;
 
     @Override
     public List<EventFullDto> searchEvents(AdminEventSearchParam searchParam, PageParam pageParam) {
@@ -51,15 +52,10 @@ public class AdminEventServiceImpl implements AdminEventService {
                     .and(EventSpecifications.categoryIdIn(searchParam.getCategories()))
                     .and(EventSpecifications.stateIn(searchParam.getStates()));
 
-            Long placeId = searchParam.getPlaceId();
-            Place place = null;
-
-            if (placeId != null) {
-                place = placeRepository.findById(placeId)
-                        .orElseThrow(() -> new NotFoundException("Не найдено место с id: " + placeId));
-            }
-
-            spec = spec.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
+            spec = spec.and(getLocationSpecification(
+                    searchParam.getPlaceId(),
+                    searchParam.getRadius()
+            ));
         }
 
         List<Event> events = eventRepository.findAll(spec, pageable).getContent();
@@ -115,6 +111,9 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
+        if (request.getLocation() != null) {
+            locationClient.saveLocation(updatedEvent.getId(), request.getLocation());
+        }
 
         log.info("Событие с ID {} обновлено.", eventId);
 
@@ -127,12 +126,9 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Event event = findEventByOrThrow(eventId);
 
-        Place place = placeRepository.findById(placeId)
-                .orElseThrow(() -> new NotFoundException("Не найдено место: " + placeId));
+        setPlaceOrThrow(eventId, placeId);
 
-        event.setPlace(place);
-
-        return eventDtoAssembler.toFullDto(eventRepository.save(event));
+        return eventDtoAssembler.toFullDto(event);
     }
 
     @Override
@@ -140,14 +136,38 @@ public class AdminEventServiceImpl implements AdminEventService {
         log.info("Отвязка места от события с id: {}", eventId);
         Event event = findEventByOrThrow(eventId);
 
-        event.setPlace(null);
-
-        eventRepository.save(event);
+        locationClient.removePlace(eventId);
     }
 
     private Event findEventByOrThrow(long eventId) {
         return eventRepository.findById(eventId).orElseThrow(
                 () -> new NotFoundException("Событие с id " + eventId + " не найдено."));
+    }
+
+    private void setPlaceOrThrow(long eventId, long placeId) {
+        try {
+            locationClient.setPlace(eventId, placeId);
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найдено место: " + placeId);
+        }
+    }
+
+    private Specification<Event> getLocationSpecification(Long placeId, Double radius) {
+        if (radius != null && placeId == null) {
+            throw new ValidationException(
+                    "Нельзя указывать радиус без указания места"
+            );
+        }
+
+        if (placeId == null) {
+            return null;
+        }
+
+        try {
+            return EventSpecifications.idIn(locationClient.findEventIds(placeId, radius));
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найдено место: " + placeId);
+        }
     }
 
 }

@@ -1,9 +1,9 @@
-package ewm.main.place.service;
+package ewm.locationservice.place.service;
 
-import ewm.main.dto.search.PageParam;
-import ewm.main.exception.NotFoundException;
-import ewm.main.place.Place;
-import ewm.main.place.repository.PlaceRepository;
+import ewm.locationservice.dto.PageParam;
+import ewm.locationservice.exception.NotFoundException;
+import ewm.locationservice.place.Place;
+import ewm.locationservice.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -52,5 +52,10 @@ public class PlaceServiceImpl implements PlaceService {
     public Place getById(long placeId) {
         return placeRepository.findById(placeId)
                 .orElseThrow(() -> new NotFoundException("Локация не найдена: " + placeId));
+    }
+
+    @Override
+    public List<Place> getByIds(List<Long> ids) {
+        return placeRepository.findAllById(ids);
     }
 }

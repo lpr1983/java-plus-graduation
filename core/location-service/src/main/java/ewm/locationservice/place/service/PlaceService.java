@@ -1,7 +1,7 @@
-package ewm.main.place.service;
+package ewm.locationservice.place.service;
 
-import ewm.main.dto.search.PageParam;
-import ewm.main.place.Place;
+import ewm.locationservice.dto.PageParam;
+import ewm.locationservice.place.Place;
 
 import java.util.List;
 
@@ -16,4 +16,6 @@ public interface PlaceService {
     List<Place> getAll(PageParam pageParam);
 
     Place getById(long placeId);
+
+    List<Place> getByIds(List<Long> ids);
 }

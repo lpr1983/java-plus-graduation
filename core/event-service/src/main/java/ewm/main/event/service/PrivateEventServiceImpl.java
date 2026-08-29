@@ -9,8 +9,7 @@ import ewm.main.event.model.EventState;
 import ewm.main.dto.search.PageParam;
 import ewm.main.event.repository.EventRepository;
 import ewm.main.exception.ConflictException;
-import ewm.main.place.Place;
-import ewm.main.place.repository.PlaceRepository;
+import ewm.main.location.LocationClient;
 import jakarta.validation.ValidationException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
     private final EventDtoAssembler eventDtoAssembler;
-    private final PlaceRepository placeRepository;
+    private final LocationClient locationClient;
 
     @Override
     public EventFullDto getEventOfUserById(long userId, long eventId) {
@@ -77,6 +76,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         event.setCreatedOn(LocalDateTime.now());
         event.setState(EventState.PENDING);
         Event savedEvent = eventRepository.save(event);
+        locationClient.saveLocation(savedEvent.getId(), dto.getLocation());
         log.info("Событие успешно создано с id: {}", savedEvent.getId());
 
         return eventDtoAssembler.toFullDto(savedEvent);
@@ -105,6 +105,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
+        if (dto.getLocation() != null) {
+            locationClient.saveLocation(updatedEvent.getId(), dto.getLocation());
+        }
         log.info("Событие успешно обновлено с id: {}", updatedEvent.getId());
 
         return eventDtoAssembler.toFullDto(updatedEvent);
@@ -118,12 +121,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         checkEventIsEditable(event);
 
-        Place place = placeRepository.findById(placeId)
-                .orElseThrow(() -> new NotFoundException("Не найдено место: " + placeId));
+        setPlaceOrThrow(eventId, placeId);
 
-        event.setPlace(place);
-
-        return eventDtoAssembler.toFullDto(eventRepository.save(event));
+        return eventDtoAssembler.toFullDto(event);
     }
 
     @Override
@@ -134,9 +134,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         checkEventIsEditable(event);
 
-        event.setPlace(null);
-
-        eventRepository.save(event);
+        locationClient.removePlace(eventId);
     }
 
     private UserShortDto findUserByIdOrThrow(long userId) {
@@ -150,6 +148,14 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     private Category findCategoryByIdOrThrow(long categoryId) {
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new NotFoundException("Не найдена категория с id: " + categoryId));
+    }
+
+    private void setPlaceOrThrow(long eventId, long placeId) {
+        try {
+            locationClient.setPlace(eventId, placeId);
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найдено место: " + placeId);
+        }
     }
 
     private Event findEventByUserIdAndEventIdOrThrow(long userId, long eventId) {

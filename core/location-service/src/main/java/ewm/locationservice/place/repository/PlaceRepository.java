@@ -1,6 +1,6 @@
-package ewm.main.place.repository;
+package ewm.locationservice.place.repository;
 
-import ewm.main.place.Place;
+import ewm.locationservice.place.Place;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {

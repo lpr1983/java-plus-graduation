@@ -7,6 +7,7 @@ $services = @(
     'stat/stats-server',
     'core/user-service',
     'core/request-service',
+    'core/location-service',
     'core/event-service',
     'infra/gateway-server'
 )

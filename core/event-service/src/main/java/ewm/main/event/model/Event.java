@@ -1,9 +1,7 @@
 package ewm.main.event.model;
 
 import ewm.main.category.Category;
-import ewm.main.place.Place;
 import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -51,9 +49,6 @@ public class Event {
     @Column(name = "event_date", nullable = false)
     private LocalDateTime eventDate;
 
-    @Embedded
-    private Location location;
-
     @Column(name = "paid", nullable = false)
     @Builder.Default
     private boolean paid = false;
@@ -79,7 +74,4 @@ public class Event {
     @Column(name = "created_on", nullable = false)
     private LocalDateTime createdOn;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id")
-    private Place place;
 }

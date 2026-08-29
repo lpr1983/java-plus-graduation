@@ -1,8 +1,8 @@
-package ewm.main.place.controller;
+package ewm.locationservice.place.controller;
 
-import ewm.main.dto.search.PageParam;
-import ewm.main.place.Place;
-import ewm.main.place.service.PlaceService;
+import ewm.locationservice.dto.PageParam;
+import ewm.locationservice.place.Place;
+import ewm.locationservice.place.service.PlaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +17,7 @@ import java.util.List;
 @RequestMapping("/places")
 @RequiredArgsConstructor
 public class PublicPlaceController {
+
     private final PlaceService placeService;
 
     @GetMapping
