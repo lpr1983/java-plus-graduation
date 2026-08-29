@@ -6,9 +6,16 @@ $services = @(
     'infra/config-server',
     'stat/stats-server',
     'core/user-service',
-    'core/main-service',
+    'core/request-service',
+    'core/event-service',
     'infra/gateway-server'
 )
+
+& $mvn install -DskipTests
+
+if ($LASTEXITCODE -ne 0) {
+    throw 'Failed to build and install project modules.'
+}
 
 foreach ($service in $services) {
     $command = "& '$mvn' -pl '$service' spring-boot:run"

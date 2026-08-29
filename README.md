@@ -8,10 +8,10 @@
 
 - Eureka Discovery Server для регистрации и обнаружения сервисов;
 - Spring Cloud Config Server для централизованного хранения настроек;
-- Spring Cloud Gateway на порту `8080` с маршрутами ко всему API `main-service`;
-- регистрация `main-service`, `stats-server`, Config Server и Gateway в Eureka;
+- Spring Cloud Gateway на порту `8080` с маршрутами ко всему API `event-service`;
+- регистрация `event-service`, `stats-server`, Config Server и Gateway в Eureka;
 - запуск прикладных сервисов и Config Server на динамических портах.
 
-`main-service` и `stats-server` получают внешние настройки через Config Server, обнаруживая его через Eureka. Клиент статистики использует общий интерфейс `DiscoveryClient`, поэтому не зависит от конкретной реализации службы обнаружения. Если экземпляр `stats-server` ещё не зарегистрирован, поиск повторяется с помощью `RetryTemplate`: до трёх попыток с интервалом три секунды.
+`event-service` и `stats-server` получают внешние настройки через Config Server, обнаруживая его через Eureka. Клиент статистики использует общий интерфейс `DiscoveryClient`, поэтому не зависит от конкретной реализации службы обнаружения. Если экземпляр `stats-server` ещё не зарегистрирован, поиск повторяется с помощью `RetryTemplate`: до трёх попыток с интервалом три секунды.
 
-Gateway использует маршруты вида `lb://main-service`: актуальный экземпляр основного сервиса выбирается через Eureka и Spring Cloud LoadBalancer.
+Gateway использует маршруты вида `lb://event-service`: актуальный экземпляр сервиса событий выбирается через Eureka и Spring Cloud LoadBalancer.

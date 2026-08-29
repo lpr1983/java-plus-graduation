@@ -125,7 +125,7 @@
           "app": {
             "type": "string",
             "description": "Идентификатор сервиса для которого записывается информация",
-            "example": "main-service"
+            "example": "event-service"
           },
           "uri": {
             "type": "string",
@@ -150,7 +150,7 @@
           "app": {
             "type": "string",
             "description": "Название сервиса",
-            "example": "main-service"
+            "example": "event-service"
           },
           "uri": {
             "type": "string",

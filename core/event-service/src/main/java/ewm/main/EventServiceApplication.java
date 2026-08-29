@@ -10,9 +10,9 @@ import org.springframework.context.annotation.ComponentScan;
 @EnableFeignClients
 @Slf4j
 @ComponentScan(value = {"ewm.main", "ewm.stat.client"})
-public class MainServiceApplication {
+public class EventServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(MainServiceApplication.class, args);
+        SpringApplication.run(EventServiceApplication.class, args);
     }
 }
