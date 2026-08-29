@@ -1,4 +1,4 @@
-package ewm.main.dto;
+package ewm.requestservice.dto;
 
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;

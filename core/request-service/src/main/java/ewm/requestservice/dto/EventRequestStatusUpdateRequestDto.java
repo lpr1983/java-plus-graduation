@@ -1,4 +1,4 @@
-package ewm.main.dto;
+package ewm.requestservice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

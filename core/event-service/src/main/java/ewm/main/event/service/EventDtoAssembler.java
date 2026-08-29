@@ -1,14 +1,13 @@
 package ewm.main.event.service;
 
+import ewm.main.dto.ConfirmedRequestsCountDto;
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.EventShortDto;
 import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
 import ewm.main.exception.NotFoundException;
-import ewm.main.request.model.RequestStatus;
-import ewm.main.request.repository.EventConfirmedRequestsCount;
-import ewm.main.request.repository.ParticipationRequestRepository;
+import ewm.main.request.RequestClient;
 import ewm.main.stat.StatService;
 import ewm.main.user.UserClient;
 import ewm.stat.client.model.GetStatsParams;
@@ -28,14 +27,14 @@ public class EventDtoAssembler {
     private static final boolean UNIQUE_VIEWS = true;
 
     private final StatService statService;
-    private final ParticipationRequestRepository participationRequestRepository;
+    private final RequestClient requestClient;
     private final UserClient userClient;
 
     public EventDtoAssembler(StatService statService,
-                             ParticipationRequestRepository participationRequestRepository,
+                             RequestClient requestClient,
                              UserClient userClient) {
         this.statService = statService;
-        this.participationRequestRepository = participationRequestRepository;
+        this.requestClient = requestClient;
         this.userClient = userClient;
     }
 
@@ -131,10 +130,8 @@ public class EventDtoAssembler {
     }
 
     private Long getConfirmedRequests(Event event) {
-        return participationRequestRepository.countByEventIdAndStatus(
-                event.getId(),
-                RequestStatus.CONFIRMED
-        );
+        Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(List.of(event));
+        return getConfirmedRequestsForEvent(event, confirmedRequestsByEventId);
     }
 
     private Map<Long, Long> getConfirmedRequestsByEventId(List<Event> events) {
@@ -144,15 +141,11 @@ public class EventDtoAssembler {
 
         List<Long> eventIds = getEventIds(events);
 
-        List<EventConfirmedRequestsCount> counts =
-                participationRequestRepository.countConfirmedRequestsByEventIds(
-                        eventIds,
-                        RequestStatus.CONFIRMED
-                );
+        List<ConfirmedRequestsCountDto> counts = requestClient.getConfirmedRequestsCounts(eventIds);
 
         Map<Long, Long> result = new HashMap<>();
 
-        for (EventConfirmedRequestsCount count : counts) {
+        for (ConfirmedRequestsCountDto count : counts) {
             result.put(count.getEventId(), count.getConfirmedRequests());
         }
 
