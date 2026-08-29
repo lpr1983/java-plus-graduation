@@ -1,5 +1,7 @@
-package ewm.main.user;
+package ewm.userservice.controller;
 
+import ewm.userservice.service.UserService;
+import ewm.userservice.entity.User;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
