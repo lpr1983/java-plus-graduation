@@ -27,18 +27,9 @@ public class UserController {
         return userService.createUser(user);
     }
 
-    /**
-     * Получение информации о пользователях
-     *
-     * @param ids  массив ID пользователей (опционально)
-     * @param from количество элементов, которые нужно пропустить (по умолчанию 0)
-     * @param size количество элементов в наборе (по умолчанию 10)
-     * @return список пользователей, соответствующий фильтрам
-     */
-
     @GetMapping
     public List<User> getUsers(
-            @RequestParam(required = false) List<Long> ids, // почему в задании Integer?
+            @RequestParam(required = false) List<Long> ids,
             @RequestParam(defaultValue = "0") int from,
             @RequestParam(defaultValue = "10") int size) {
 
@@ -46,7 +37,6 @@ public class UserController {
             return userService.findUsersByIds(ids);
         }
 
-        // Иначе — возвращаем всех пользователей с учётом параметров пагинации
         return userService.findAllUsers(from, size);
     }
 
