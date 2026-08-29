@@ -2,13 +2,17 @@ package ewm.main.event.service;
 
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.EventShortDto;
+import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
+import ewm.main.exception.NotFoundException;
 import ewm.main.request.model.RequestStatus;
 import ewm.main.request.repository.EventConfirmedRequestsCount;
 import ewm.main.request.repository.ParticipationRequestRepository;
 import ewm.main.stat.StatService;
+import ewm.main.user.UserClient;
 import ewm.stat.client.model.GetStatsParams;
+import feign.FeignException;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -25,15 +29,18 @@ public class EventDtoAssembler {
 
     private final StatService statService;
     private final ParticipationRequestRepository participationRequestRepository;
+    private final UserClient userClient;
 
     public EventDtoAssembler(StatService statService,
-                             ParticipationRequestRepository participationRequestRepository) {
+                             ParticipationRequestRepository participationRequestRepository,
+                             UserClient userClient) {
         this.statService = statService;
         this.participationRequestRepository = participationRequestRepository;
+        this.userClient = userClient;
     }
 
     public EventShortDto toShortDto(Event event) {
-        EventShortDto dto = EventMapper.toShortDto(event);
+        EventShortDto dto = EventMapper.toShortDto(event, getInitiator(event));
 
         dto.setViews(getViews(event));
         dto.setConfirmedRequests(getConfirmedRequests(event));
@@ -42,7 +49,7 @@ public class EventDtoAssembler {
     }
 
     public EventFullDto toFullDto(Event event) {
-        EventFullDto dto = EventMapper.toFullDto(event);
+        EventFullDto dto = EventMapper.toFullDto(event, getInitiator(event));
 
         dto.setViews(getViews(event));
         dto.setConfirmedRequests(getConfirmedRequests(event));
@@ -53,11 +60,12 @@ public class EventDtoAssembler {
     public List<EventShortDto> toShortDtoList(List<Event> events) {
         Map<Long, Long> viewsByEventId = getViewsByEventId(events);
         Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(events);
+        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events);
 
         List<EventShortDto> result = new ArrayList<>();
 
         for (Event event : events) {
-            EventShortDto dto = EventMapper.toShortDto(event);
+            EventShortDto dto = EventMapper.toShortDto(event, getInitiatorFromCache(event, initiatorsById));
             dto.setViews(getViewsForEvent(event, viewsByEventId));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
             result.add(dto);
@@ -69,14 +77,54 @@ public class EventDtoAssembler {
     public List<EventFullDto> toFullDtoList(List<Event> events) {
         Map<Long, Long> viewsByEventId = getViewsByEventId(events);
         Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(events);
+        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events);
 
         List<EventFullDto> result = new ArrayList<>();
 
         for (Event event : events) {
-            EventFullDto dto = EventMapper.toFullDto(event);
+            EventFullDto dto = EventMapper.toFullDto(event, getInitiatorFromCache(event, initiatorsById));
             dto.setViews(getViewsForEvent(event, viewsByEventId));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
             result.add(dto);
+        }
+
+        return result;
+    }
+
+    private UserShortDto getInitiator(Event event) {
+        try {
+            return userClient.getUser(event.getInitiatorId());
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найден пользователь с id: " + event.getInitiatorId());
+        }
+    }
+
+    private UserShortDto getInitiatorFromCache(Event event, Map<Long, UserShortDto> initiatorsById) {
+        UserShortDto initiator = initiatorsById.get(event.getInitiatorId());
+
+        if (initiator == null) {
+            throw new NotFoundException("Не найден пользователь с id: " + event.getInitiatorId());
+        }
+
+        return initiator;
+    }
+
+    private Map<Long, UserShortDto> getInitiatorsById(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<Long> initiatorIds = new LinkedHashSet<>();
+
+        for (Event event : events) {
+            initiatorIds.add(event.getInitiatorId());
+        }
+
+        List<UserShortDto> initiators = userClient.getUsers(new ArrayList<>(initiatorIds));
+        Map<Long, UserShortDto> result = new HashMap<>();
+
+        for (UserShortDto initiator : initiators) {
+            result.put(initiator.getId(), initiator);
         }
 
         return result;

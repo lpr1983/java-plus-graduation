@@ -62,7 +62,7 @@ public final class EventSpecifications {
             return null;
         }
 
-        return (root, query, cb) -> root.get("initiator").get("id").in(ids);
+        return (root, query, cb) -> root.get("initiatorId").in(ids);
     }
 
     public static Specification<Event> categoryIdIn(List<Long> ids) {

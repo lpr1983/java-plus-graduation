@@ -27,7 +27,6 @@ import ewm.main.category.repository.CategoryRepository;
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.NewEventDto;
 import ewm.main.exception.NotFoundException;
-import ewm.main.user.User;
 import ewm.main.user.UserClient;
 import feign.FeignException;
 import org.springframework.data.domain.PageRequest;
@@ -68,7 +67,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         Pageable pageable = PageRequest.of(pageParam.getFrom() / pageParam.getSize(), pageParam.getSize());
 
-        List<Event> events = eventRepository.findByInitiator_IdOrderByEventDateAsc(userId, pageable);
+        List<Event> events = eventRepository.findByInitiatorIdOrderByEventDateAsc(userId, pageable);
 
         log.info("Количество событий: {}", events.size());
 
@@ -81,7 +80,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         validateEventDate(dto.getEventDate());
 
-        User user = findUserByIdOrThrow(userId);
+        UserShortDto user = findUserByIdOrThrow(userId);
 
         Category category = findCategoryByIdOrThrow(dto.getCategory());
 
@@ -126,7 +125,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     public List<ParticipationRequestDto> getRequestsForEvent(long userId, long eventId) {
         log.info("Получение заявок на участие для userId: {} и eventId: {}", userId, eventId);
 
-        if (eventRepository.findOneByInitiator_IdAndId(userId, eventId).isEmpty()) {
+        if (eventRepository.findOneByInitiatorIdAndId(userId, eventId).isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -270,13 +269,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         return resultDto;
     }
 
-    private User findUserByIdOrThrow(long userId) {
+    private UserShortDto findUserByIdOrThrow(long userId) {
         try {
-            UserShortDto user = userClient.getUser(userId);
-            return User.builder()
-                    .id(user.getId())
-                    .name(user.getName())
-                    .build();
+            return userClient.getUser(userId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найден пользователь с id: " + userId);
         }
@@ -288,7 +283,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     }
 
     private Event findEventByUserIdAndEventIdOrThrow(long userId, long eventId) {
-        return eventRepository.findOneByInitiator_IdAndId(userId, eventId)
+        return eventRepository.findOneByInitiatorIdAndId(userId, eventId)
                 .orElseThrow(() -> new NotFoundException(
                         String.format("У пользователя с id: %d нет события с id: %d", userId, eventId)));
     }

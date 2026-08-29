@@ -3,6 +3,7 @@ package ewm.userservice.handler;
 import ewm.userservice.dto.ApiErrorDto;
 import ewm.userservice.exception.ConflictException;
 import ewm.userservice.exception.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -83,6 +85,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorDto> handleInternal(Exception e) {
+        log.error("Unhandled exception", e);
+
         ApiErrorDto errorResponse = ApiErrorDto.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.name())
                 .reason("Internal unknown server error.")

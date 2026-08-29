@@ -11,7 +11,6 @@ import ewm.main.request.mapper.ParticipationRequestMapper;
 import ewm.main.request.model.ParticipationRequest;
 import ewm.main.request.model.RequestStatus;
 import ewm.main.request.repository.ParticipationRequestRepository;
-import ewm.main.user.User;
 import ewm.main.user.UserClient;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -46,11 +45,11 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     public ParticipationRequestDto addRequest(long userId, long eventId) {
         log.info("Adding request from userId: {} to eventId: {}", userId, eventId);
 
-        User requester = findUserOrThrow(userId);
+        UserShortDto requester = findUserOrThrow(userId);
         Event event = findEventOrThrow(eventId);
 
         // нельзя участвовать в своём событии
-        if (event.getInitiator().getId().equals(userId)) {
+        if (event.getInitiatorId().equals(userId)) {
             throw new ConflictException("Нельзя подать заявку на участие в своём событии");
         }
 
@@ -81,7 +80,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
         ParticipationRequest request = ParticipationRequest.builder()
                 .event(event)
-                .requester(requester)
+                .requesterId(requester.getId())
                 .status(status)
                 .created(LocalDateTime.now())
                 .build();
@@ -101,7 +100,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         ParticipationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Заявка с id=" + requestId + " не найдена"));
 
-        if (!request.getRequester().getId().equals(userId)) {
+        if (!request.getRequesterId().equals(userId)) {
             throw new ConflictException("Нельзя отменить чужую заявку");
         }
 
@@ -109,13 +108,9 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
         return ParticipationRequestMapper.toDto(requestRepository.save(request));
     }
 
-    private User findUserOrThrow(long userId) {
+    private UserShortDto findUserOrThrow(long userId) {
         try {
-            UserShortDto user = userClient.getUser(userId);
-            return User.builder()
-                    .id(user.getId())
-                    .name(user.getName())
-                    .build();
+            return userClient.getUser(userId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Пользователь с id=" + userId + " не найден");
         }

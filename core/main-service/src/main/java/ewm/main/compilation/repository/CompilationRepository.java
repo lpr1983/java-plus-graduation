@@ -30,8 +30,7 @@ public interface CompilationRepository extends JpaRepository<Compilation, Long> 
 
     @EntityGraph(attributePaths = {
             "events",
-            "events.category",
-            "events.initiator"
+            "events.category"
     })
     List<Compilation> findByIdInOrderByIdAsc(List<Long> ids);
 }
