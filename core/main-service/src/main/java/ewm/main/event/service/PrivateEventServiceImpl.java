@@ -5,6 +5,7 @@ import ewm.main.dto.EventRequestStatusUpdateResultDto;
 import ewm.main.dto.EventShortDto;
 import ewm.main.dto.ParticipationRequestDto;
 import ewm.main.dto.UpdateEventUserRequestDto;
+import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
 import ewm.main.event.model.EventState;
@@ -27,7 +28,8 @@ import ewm.main.dto.EventFullDto;
 import ewm.main.dto.NewEventDto;
 import ewm.main.exception.NotFoundException;
 import ewm.main.user.User;
-import ewm.main.user.UserRepository;
+import ewm.main.user.UserClient;
+import feign.FeignException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,7 @@ import java.util.List;
 @Service
 @AllArgsConstructor
 public class PrivateEventServiceImpl implements PrivateEventService {
-    private final UserRepository userRepository;
+    private final UserClient userClient;
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
     private final ParticipationRequestRepository participationRequestRepository;
@@ -269,8 +271,15 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     }
 
     private User findUserByIdOrThrow(long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Не найден пользователь с id: " + userId));
+        try {
+            UserShortDto user = userClient.getUser(userId);
+            return User.builder()
+                    .id(user.getId())
+                    .name(user.getName())
+                    .build();
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Не найден пользователь с id: " + userId);
+        }
     }
 
     private Category findCategoryByIdOrThrow(long categoryId) {

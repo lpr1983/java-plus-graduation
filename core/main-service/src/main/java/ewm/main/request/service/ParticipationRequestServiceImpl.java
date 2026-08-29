@@ -1,6 +1,7 @@
 package ewm.main.request.service;
 
 import ewm.main.dto.ParticipationRequestDto;
+import ewm.main.dto.UserShortDto;
 import ewm.main.event.model.Event;
 import ewm.main.event.model.EventState;
 import ewm.main.event.repository.EventRepository;
@@ -11,7 +12,8 @@ import ewm.main.request.model.ParticipationRequest;
 import ewm.main.request.model.RequestStatus;
 import ewm.main.request.repository.ParticipationRequestRepository;
 import ewm.main.user.User;
-import ewm.main.user.UserRepository;
+import ewm.main.user.UserClient;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,7 +29,7 @@ import java.util.stream.Collectors;
 public class ParticipationRequestServiceImpl implements ParticipationRequestService {
 
     private final ParticipationRequestRepository requestRepository;
-    private final UserRepository userRepository;
+    private final UserClient userClient;
     private final EventRepository eventRepository;
 
     @Override
@@ -108,8 +110,15 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     }
 
     private User findUserOrThrow(long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id=" + userId + " не найден"));
+        try {
+            UserShortDto user = userClient.getUser(userId);
+            return User.builder()
+                    .id(user.getId())
+                    .name(user.getName())
+                    .build();
+        } catch (FeignException.NotFound exception) {
+            throw new NotFoundException("Пользователь с id=" + userId + " не найден");
+        }
     }
 
     private Event findEventOrThrow(long eventId) {
