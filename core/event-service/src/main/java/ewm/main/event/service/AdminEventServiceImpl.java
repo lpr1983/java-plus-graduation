@@ -61,7 +61,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         log.info("Найдено {} событий, соответствующих критериям.", events.size());
 
-        return eventDtoAssembler.toFullDtoList(events);
+        return eventDtoAssembler.toFullDtoListForRead(events);
     }
 
     @Override

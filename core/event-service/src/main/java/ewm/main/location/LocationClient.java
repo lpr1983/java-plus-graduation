@@ -8,7 +8,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "location-service", path = "/internal/places")
+@FeignClient(
+        name = "location-service",
+        path = "/internal/places",
+        fallbackFactory = LocationClientFallbackFactory.class
+)
 public interface LocationClient {
 
     @GetMapping("/{placeId}")

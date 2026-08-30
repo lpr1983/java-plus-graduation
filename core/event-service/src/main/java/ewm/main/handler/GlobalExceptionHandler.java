@@ -5,6 +5,7 @@ import ewm.main.exception.ConflictException;
 import ewm.main.exception.DataIntegrityViolationException;
 import ewm.main.exception.ForbiddenException;
 import ewm.main.exception.NotFoundException;
+import ewm.main.exception.ServiceUnavailableException;
 import ewm.main.exception.ValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -120,6 +121,20 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiErrorDto> handleServiceUnavailable(ServiceUnavailableException e) {
+        log.error("Downstream service is unavailable", e);
+
+        ApiErrorDto errorResponse = ApiErrorDto.builder()
+                .status(HttpStatus.SERVICE_UNAVAILABLE.name())
+                .reason("Downstream service is temporarily unavailable.")
+                .message(e.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)

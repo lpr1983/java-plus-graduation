@@ -3,6 +3,7 @@ package ewm.requestservice.handler;
 import ewm.requestservice.dto.ApiErrorDto;
 import ewm.requestservice.exception.ConflictException;
 import ewm.requestservice.exception.NotFoundException;
+import ewm.requestservice.exception.ServiceUnavailableException;
 import ewm.requestservice.exception.ValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -56,6 +57,16 @@ public class GlobalExceptionHandler {
         return buildResponse(
                 HttpStatus.CONFLICT,
                 "For the requested operation the conditions are not met.",
+                e.getMessage()
+        );
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiErrorDto> handleServiceUnavailable(ServiceUnavailableException e) {
+        log.error("Downstream service is unavailable", e);
+        return buildResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Downstream service is temporarily unavailable.",
                 e.getMessage()
         );
     }

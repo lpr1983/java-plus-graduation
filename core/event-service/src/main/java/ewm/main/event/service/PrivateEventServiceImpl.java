@@ -47,7 +47,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         log.info("Событие успешно получено, eventId: {}", eventId);
 
-        return eventDtoAssembler.toFullDto(event);
+        return eventDtoAssembler.toFullDtoForRead(event);
     }
 
     @Override
@@ -60,7 +60,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         log.info("Количество событий: {}", events.size());
 
-        return eventDtoAssembler.toShortDtoList(events);
+        return eventDtoAssembler.toShortDtoListForRead(events);
     }
 
     @Override

@@ -7,7 +7,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "request-service", path = "/internal/requests")
+@FeignClient(
+        name = "request-service",
+        path = "/internal/requests",
+        fallbackFactory = RequestClientFallbackFactory.class
+)
 public interface RequestClient {
 
     @GetMapping("/confirmed-counts")

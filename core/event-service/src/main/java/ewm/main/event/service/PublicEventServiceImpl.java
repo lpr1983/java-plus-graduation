@@ -86,7 +86,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         log.info("Найдено {} событий, соответствующих критериям.", events.size());
 
-        return eventDtoAssembler.toShortDtoList(events);
+        return eventDtoAssembler.toShortDtoListForRead(events);
     }
 
     private List<EventShortDto> getEventsSortedByViews(Specification<Event> specification,
@@ -94,7 +94,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         List<Event> events = eventRepository.findAll(specification);
         log.info("Найдено {} событий для сортировки по просмотрам.", events.size());
 
-        List<EventShortDto> dtos = eventDtoAssembler.toShortDtoList(events);
+        List<EventShortDto> dtos = eventDtoAssembler.toShortDtoListForRead(events);
 
         return dtos.stream()
                 .sorted(viewsComparator())
@@ -126,6 +126,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         Event event = eventRepository.findOneByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Событие с id: " + id + " не найдено или недоступно"));
 
-        return eventDtoAssembler.toFullDto(event);
+        return eventDtoAssembler.toFullDtoForRead(event);
     }
 }

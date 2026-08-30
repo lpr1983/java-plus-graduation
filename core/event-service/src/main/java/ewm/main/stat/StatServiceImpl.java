@@ -1,5 +1,6 @@
 package ewm.main.stat;
 
+import ewm.main.exception.ServiceUnavailableException;
 import ewm.main.stat.dto.HitDto;
 import ewm.main.stat.dto.StatDto;
 import feign.FeignException;
@@ -39,7 +40,7 @@ public class StatServiceImpl implements StatService {
 
         try {
             statClient.saveHit(hitDto);
-        } catch (FeignException exception) {
+        } catch (FeignException | ServiceUnavailableException exception) {
             log.error("Ошибка работы statClient.saveHit: {}", exception.getMessage());
         }
     }
@@ -57,7 +58,7 @@ public class StatServiceImpl implements StatService {
                     unique
             );
             return toViewsByUri(statResult);
-        } catch (FeignException exception) {
+        } catch (FeignException | ServiceUnavailableException exception) {
             log.error("Ошибка работы statClient.getStats: {}", exception.getMessage());
             return null;
         }

@@ -10,7 +10,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "${stat-service.name:stats-server}")
+@FeignClient(
+        name = "${stat-service.name:stats-server}",
+        fallbackFactory = StatClientFallbackFactory.class
+)
 public interface StatClient {
 
     @PostMapping("/hit")

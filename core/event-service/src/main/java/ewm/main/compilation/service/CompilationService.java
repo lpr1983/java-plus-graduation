@@ -114,7 +114,7 @@ public class CompilationService {
         }
 
         // Соответствие идентификатора события -> Dto события
-        Map<Long, EventShortDto> eventDtoById = eventDtoAssembler.toShortDtoList(allEvents).stream()
+        Map<Long, EventShortDto> eventDtoById = eventDtoAssembler.toShortDtoListForRead(allEvents).stream()
                 .collect(Collectors.toMap(
                         (d) -> d.getId(),
                         Function.identity()
@@ -141,7 +141,10 @@ public class CompilationService {
     @Transactional
     public CompilationDto get(Long id) {
         Compilation compilation = compilationRepository.findById(id).orElseThrow(() -> new NotFoundException("Compilation not found"));
-        return CompilationMapper.toDto(compilation, eventDtoAssembler.toShortDtoList(compilation.getEvents()));
+        return CompilationMapper.toDto(
+                compilation,
+                eventDtoAssembler.toShortDtoListForRead(compilation.getEvents())
+        );
     }
 
     private Boolean isTitleTaken(String title) {

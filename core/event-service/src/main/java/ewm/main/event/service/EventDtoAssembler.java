@@ -8,12 +8,14 @@ import ewm.main.dto.ShortPlaceDto;
 import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
+import ewm.main.exception.ServiceUnavailableException;
 import ewm.main.location.LocationClient;
 import ewm.main.location.PlaceMapper;
 import ewm.main.request.RequestClient;
 import ewm.main.stat.StatService;
 import ewm.main.user.UserClient;
 import feign.FeignException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -25,9 +27,11 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
+@Slf4j
 public class EventDtoAssembler {
     private static final boolean UNIQUE_VIEWS = true;
     private static final String MISSING_USER_NAME = "Объект не найден";
+    private static final String UNAVAILABLE_USER_NAME = "Данные временно недоступны";
 
     private final StatService statService;
     private final RequestClient requestClient;
@@ -45,27 +49,48 @@ public class EventDtoAssembler {
     }
 
     public EventShortDto toShortDto(Event event) {
-        EventShortDto dto = EventMapper.toShortDto(event, getInitiator(event));
+        EventShortDto dto = EventMapper.toShortDto(event, getInitiator(event, false));
 
         dto.setViews(getViews(event));
-        dto.setConfirmedRequests(getConfirmedRequests(event));
+        dto.setConfirmedRequests(getConfirmedRequests(event, false));
 
         return dto;
     }
 
     public EventFullDto toFullDto(Event event) {
-        EventFullDto dto = EventMapper.toFullDto(event, getInitiator(event), getPlace(event));
+        return toFullDto(event, false);
+    }
+
+    public EventFullDto toFullDtoForRead(Event event) {
+        return toFullDto(event, true);
+    }
+
+    private EventFullDto toFullDto(Event event, boolean allowUnavailableServices) {
+        EventFullDto dto = EventMapper.toFullDto(
+                event,
+                getInitiator(event, allowUnavailableServices),
+                getPlace(event, allowUnavailableServices)
+        );
 
         dto.setViews(getViews(event));
-        dto.setConfirmedRequests(getConfirmedRequests(event));
+        dto.setConfirmedRequests(getConfirmedRequests(event, allowUnavailableServices));
 
         return dto;
     }
 
     public List<EventShortDto> toShortDtoList(List<Event> events) {
+        return toShortDtoList(events, false);
+    }
+
+    public List<EventShortDto> toShortDtoListForRead(List<Event> events) {
+        return toShortDtoList(events, true);
+    }
+
+    private List<EventShortDto> toShortDtoList(List<Event> events, boolean allowUnavailableServices) {
         Map<Long, Long> viewsByEventId = getViewsByEventId(events);
-        Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(events);
-        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events);
+        Map<Long, Long> confirmedRequestsByEventId =
+                getConfirmedRequestsByEventId(events, allowUnavailableServices);
+        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
 
         List<EventShortDto> result = new ArrayList<>();
 
@@ -80,10 +105,19 @@ public class EventDtoAssembler {
     }
 
     public List<EventFullDto> toFullDtoList(List<Event> events) {
+        return toFullDtoList(events, false);
+    }
+
+    public List<EventFullDto> toFullDtoListForRead(List<Event> events) {
+        return toFullDtoList(events, true);
+    }
+
+    private List<EventFullDto> toFullDtoList(List<Event> events, boolean allowUnavailableServices) {
         Map<Long, Long> viewsByEventId = getViewsByEventId(events);
-        Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(events);
-        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events);
-        Map<Long, ShortPlaceDto> placesById = getPlacesById(events);
+        Map<Long, Long> confirmedRequestsByEventId =
+                getConfirmedRequestsByEventId(events, allowUnavailableServices);
+        Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
+        Map<Long, ShortPlaceDto> placesById = getPlacesById(events, allowUnavailableServices);
 
         List<EventFullDto> result = new ArrayList<>();
 
@@ -101,7 +135,7 @@ public class EventDtoAssembler {
         return result;
     }
 
-    private ShortPlaceDto getPlace(Event event) {
+    private ShortPlaceDto getPlace(Event event, boolean allowUnavailableServices) {
         if (event.getPlaceId() == null) {
             return null;
         }
@@ -110,6 +144,12 @@ public class EventDtoAssembler {
             return PlaceMapper.toShortDto(locationClient.getPlace(event.getPlaceId()));
         } catch (FeignException.NotFound exception) {
             return null;
+        } catch (ServiceUnavailableException exception) {
+            if (allowUnavailableServices) {
+                log.warn("Не удалось получить место для события {}: {}", event.getId(), exception.getMessage());
+                return null;
+            }
+            throw exception;
         }
     }
 
@@ -121,7 +161,7 @@ public class EventDtoAssembler {
         return placesById.get(event.getPlaceId());
     }
 
-    private Map<Long, ShortPlaceDto> getPlacesById(List<Event> events) {
+    private Map<Long, ShortPlaceDto> getPlacesById(List<Event> events, boolean allowUnavailableServices) {
         Set<Long> placeIds = new LinkedHashSet<>();
 
         for (Event event : events) {
@@ -134,7 +174,16 @@ public class EventDtoAssembler {
             return Map.of();
         }
 
-        List<PlaceInternalDto> places = locationClient.getPlaces(new ArrayList<>(placeIds));
+        List<PlaceInternalDto> places;
+        try {
+            places = locationClient.getPlaces(new ArrayList<>(placeIds));
+        } catch (ServiceUnavailableException exception) {
+            if (allowUnavailableServices) {
+                log.warn("Не удалось получить места для событий: {}", exception.getMessage());
+                return Map.of();
+            }
+            throw exception;
+        }
         Map<Long, ShortPlaceDto> result = new HashMap<>();
 
         for (PlaceInternalDto place : places) {
@@ -144,11 +193,17 @@ public class EventDtoAssembler {
         return result;
     }
 
-    private UserShortDto getInitiator(Event event) {
+    private UserShortDto getInitiator(Event event, boolean allowUnavailableServices) {
         try {
             return userClient.getUser(event.getInitiatorId());
         } catch (FeignException.NotFound exception) {
             return missingUser(event.getInitiatorId());
+        } catch (ServiceUnavailableException exception) {
+            if (allowUnavailableServices) {
+                log.warn("Не удалось получить инициатора события {}: {}", event.getId(), exception.getMessage());
+                return unavailableUser(event.getInitiatorId());
+            }
+            throw exception;
         }
     }
 
@@ -163,13 +218,21 @@ public class EventDtoAssembler {
     }
 
     private UserShortDto missingUser(long userId) {
+        return userWithSubstituteName(userId, MISSING_USER_NAME);
+    }
+
+    private UserShortDto unavailableUser(long userId) {
+        return userWithSubstituteName(userId, UNAVAILABLE_USER_NAME);
+    }
+
+    private UserShortDto userWithSubstituteName(long userId, String name) {
         return UserShortDto.builder()
                 .id(userId)
-                .name(MISSING_USER_NAME)
+                .name(name)
                 .build();
     }
 
-    private Map<Long, UserShortDto> getInitiatorsById(List<Event> events) {
+    private Map<Long, UserShortDto> getInitiatorsById(List<Event> events, boolean allowUnavailableServices) {
         if (events.isEmpty()) {
             return Map.of();
         }
@@ -180,7 +243,20 @@ public class EventDtoAssembler {
             initiatorIds.add(event.getInitiatorId());
         }
 
-        List<UserShortDto> initiators = userClient.getUsers(new ArrayList<>(initiatorIds));
+        List<UserShortDto> initiators;
+        try {
+            initiators = userClient.getUsers(new ArrayList<>(initiatorIds));
+        } catch (ServiceUnavailableException exception) {
+            if (allowUnavailableServices) {
+                log.warn("Не удалось получить инициаторов событий: {}", exception.getMessage());
+                Map<Long, UserShortDto> unavailableInitiators = new HashMap<>();
+                for (Long initiatorId : initiatorIds) {
+                    unavailableInitiators.put(initiatorId, unavailableUser(initiatorId));
+                }
+                return unavailableInitiators;
+            }
+            throw exception;
+        }
         Map<Long, UserShortDto> result = new HashMap<>();
 
         for (UserShortDto initiator : initiators) {
@@ -190,19 +266,29 @@ public class EventDtoAssembler {
         return result;
     }
 
-    private Long getConfirmedRequests(Event event) {
-        Map<Long, Long> confirmedRequestsByEventId = getConfirmedRequestsByEventId(List.of(event));
+    private Long getConfirmedRequests(Event event, boolean allowUnavailableServices) {
+        Map<Long, Long> confirmedRequestsByEventId =
+                getConfirmedRequestsByEventId(List.of(event), allowUnavailableServices);
         return getConfirmedRequestsForEvent(event, confirmedRequestsByEventId);
     }
 
-    private Map<Long, Long> getConfirmedRequestsByEventId(List<Event> events) {
+    private Map<Long, Long> getConfirmedRequestsByEventId(List<Event> events, boolean allowUnavailableServices) {
         if (events.isEmpty()) {
             return Map.of();
         }
 
         List<Long> eventIds = getEventIds(events);
 
-        List<ConfirmedRequestsCountDto> counts = requestClient.getConfirmedRequestsCounts(eventIds);
+        List<ConfirmedRequestsCountDto> counts;
+        try {
+            counts = requestClient.getConfirmedRequestsCounts(eventIds);
+        } catch (ServiceUnavailableException exception) {
+            if (allowUnavailableServices) {
+                log.warn("Не удалось получить число подтвержденных заявок: {}", exception.getMessage());
+                return null;
+            }
+            throw exception;
+        }
 
         Map<Long, Long> result = new HashMap<>();
 
@@ -214,6 +300,10 @@ public class EventDtoAssembler {
     }
 
     private Long getConfirmedRequestsForEvent(Event event, Map<Long, Long> confirmedRequestsByEventId) {
+        if (confirmedRequestsByEventId == null) {
+            return null;
+        }
+
         return confirmedRequestsByEventId.getOrDefault(event.getId(), 0L);
     }
 
