@@ -1,15 +1,14 @@
 package ewm.main.stat;
 
-import ewm.stat.client.StatClient;
-import ewm.stat.client.exception.StatClientException;
-import ewm.stat.client.exception.StatsServerUnavailableException;
-import ewm.stat.client.model.GetStatsParams;
-import ewm.stat.client.model.HitParams;
-import ewm.stat.dto.StatDto;
+import ewm.main.stat.dto.HitDto;
+import ewm.main.stat.dto.StatDto;
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,35 +16,49 @@ import java.util.Map;
 @Slf4j
 @Service
 public class StatServiceImpl implements StatService {
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final StatClient statClient;
+    private final String applicationName;
 
-    public StatServiceImpl(StatClient statClient) {
+    public StatServiceImpl(StatClient statClient,
+                           @Value("${spring.application.name}") String applicationName) {
         this.statClient = statClient;
+        this.applicationName = applicationName;
     }
 
     @Override
     public void saveHit(String uri, String ip) {
-        HitParams params = HitParams.builder()
+        HitDto hitDto = HitDto.builder()
+                .app(applicationName)
                 .uri(uri)
                 .ip(ip)
                 .timestamp(LocalDateTime.now())
                 .build();
 
         try {
-            statClient.saveHit(params);
-        } catch (StatClientException | StatsServerUnavailableException e) {
-            log.error("Ошибка работы statClient.saveHit: {}", e.getMessage());
+            statClient.saveHit(hitDto);
+        } catch (FeignException exception) {
+            log.error("Ошибка работы statClient.saveHit: {}", exception.getMessage());
         }
     }
 
     @Override
-    public Map<String, Long> getViews(GetStatsParams params) {
+    public Map<String, Long> getViews(LocalDateTime start,
+                                      LocalDateTime end,
+                                      List<String> uris,
+                                      boolean unique) {
         try {
-            List<StatDto> statResult = statClient.getStats(params);
+            List<StatDto> statResult = statClient.getStats(
+                    format(start),
+                    format(end),
+                    uris,
+                    unique
+            );
             return toViewsByUri(statResult);
-        } catch (StatClientException | StatsServerUnavailableException e) {
-            log.error("Ошибка работы statClient.getStats: {}", e.getMessage());
+        } catch (FeignException exception) {
+            log.error("Ошибка работы statClient.getStats: {}", exception.getMessage());
             return null;
         }
     }
@@ -54,12 +67,13 @@ public class StatServiceImpl implements StatService {
         Map<String, Long> viewsByUri = new HashMap<>();
 
         for (StatDto statDto : statResult) {
-            String uri = statDto.getUri();
-            Long hits = statDto.getHits();
-
-            viewsByUri.merge(uri, hits, Long::sum);
+            viewsByUri.merge(statDto.getUri(), statDto.getHits(), Long::sum);
         }
 
         return viewsByUri;
+    }
+
+    private String format(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.format(DATE_TIME_FORMATTER);
     }
 }

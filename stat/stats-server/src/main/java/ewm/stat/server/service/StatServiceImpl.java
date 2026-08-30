@@ -1,7 +1,7 @@
 package ewm.stat.server.service;
 
-import ewm.stat.dto.HitDto;
-import ewm.stat.dto.StatDto;
+import ewm.stat.server.dto.HitDto;
+import ewm.stat.server.dto.StatDto;
 import ewm.stat.server.exception.ValidationException;
 import ewm.stat.server.storage.StatStorage;
 import org.springframework.beans.factory.annotation.Autowired;

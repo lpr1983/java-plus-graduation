@@ -1,4 +1,4 @@
-package ewm.stat.dto;
+package ewm.stat.server.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;

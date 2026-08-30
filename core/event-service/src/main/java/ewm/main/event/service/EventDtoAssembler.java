@@ -8,13 +8,11 @@ import ewm.main.dto.ShortPlaceDto;
 import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.event.model.Event;
-import ewm.main.exception.NotFoundException;
 import ewm.main.location.LocationClient;
 import ewm.main.location.PlaceMapper;
 import ewm.main.request.RequestClient;
 import ewm.main.stat.StatService;
 import ewm.main.user.UserClient;
-import ewm.stat.client.model.GetStatsParams;
 import feign.FeignException;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +27,7 @@ import java.util.Set;
 @Component
 public class EventDtoAssembler {
     private static final boolean UNIQUE_VIEWS = true;
+    private static final String MISSING_USER_NAME = "Объект не найден";
 
     private final StatService statService;
     private final RequestClient requestClient;
@@ -149,7 +148,7 @@ public class EventDtoAssembler {
         try {
             return userClient.getUser(event.getInitiatorId());
         } catch (FeignException.NotFound exception) {
-            throw new NotFoundException("Не найден пользователь с id: " + event.getInitiatorId());
+            return missingUser(event.getInitiatorId());
         }
     }
 
@@ -157,10 +156,17 @@ public class EventDtoAssembler {
         UserShortDto initiator = initiatorsById.get(event.getInitiatorId());
 
         if (initiator == null) {
-            throw new NotFoundException("Не найден пользователь с id: " + event.getInitiatorId());
+            return missingUser(event.getInitiatorId());
         }
 
         return initiator;
+    }
+
+    private UserShortDto missingUser(long userId) {
+        return UserShortDto.builder()
+                .id(userId)
+                .name(MISSING_USER_NAME)
+                .build();
     }
 
     private Map<Long, UserShortDto> getInitiatorsById(List<Event> events) {
@@ -218,14 +224,12 @@ public class EventDtoAssembler {
 
         String uri = getEventUri(event);
 
-        GetStatsParams params = GetStatsParams.builder()
-                .start(event.getPublishedOn())
-                .end(LocalDateTime.now())
-                .uris(List.of(uri))
-                .unique(UNIQUE_VIEWS)
-                .build();
-
-        Map<String, Long> viewsByUri = statService.getViews(params);
+        Map<String, Long> viewsByUri = statService.getViews(
+                event.getPublishedOn(),
+                LocalDateTime.now(),
+                List.of(uri),
+                UNIQUE_VIEWS
+        );
 
         if (viewsByUri == null) {
             return null;
@@ -241,14 +245,12 @@ public class EventDtoAssembler {
             return Map.of();
         }
 
-        GetStatsParams params = GetStatsParams.builder()
-                .start(getMinPublishedOn(eventsWithPublishedOn))
-                .end(LocalDateTime.now())
-                .uris(getEventUris(eventsWithPublishedOn))
-                .unique(UNIQUE_VIEWS)
-                .build();
-
-        Map<String, Long> viewsByUri = statService.getViews(params);
+        Map<String, Long> viewsByUri = statService.getViews(
+                getMinPublishedOn(eventsWithPublishedOn),
+                LocalDateTime.now(),
+                getEventUris(eventsWithPublishedOn),
+                UNIQUE_VIEWS
+        );
 
         if (viewsByUri == null) {
             return null;

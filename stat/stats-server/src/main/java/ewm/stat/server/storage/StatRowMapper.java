@@ -1,6 +1,6 @@
 package ewm.stat.server.storage;
 
-import ewm.stat.dto.StatDto;
+import ewm.stat.server.dto.StatDto;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 

@@ -1,7 +1,7 @@
 package ewm.stat.server.storage;
 
-import ewm.stat.dto.HitDto;
-import ewm.stat.dto.StatDto;
+import ewm.stat.server.dto.HitDto;
+import ewm.stat.server.dto.StatDto;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
