@@ -1,6 +1,7 @@
 package ewm.main.event.service;
 
 import ewm.main.dto.EventShortDto;
+import ewm.main.dto.PlaceInternalDto;
 import ewm.main.dto.UpdateEventUserRequestDto;
 import ewm.main.dto.UserShortDto;
 import ewm.main.event.mapper.EventMapper;
@@ -76,7 +77,6 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         event.setCreatedOn(LocalDateTime.now());
         event.setState(EventState.PENDING);
         Event savedEvent = eventRepository.save(event);
-        locationClient.saveLocation(savedEvent.getId(), dto.getLocation());
         log.info("Событие успешно создано с id: {}", savedEvent.getId());
 
         return eventDtoAssembler.toFullDto(savedEvent);
@@ -105,9 +105,6 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
-        if (dto.getLocation() != null) {
-            locationClient.saveLocation(updatedEvent.getId(), dto.getLocation());
-        }
         log.info("Событие успешно обновлено с id: {}", updatedEvent.getId());
 
         return eventDtoAssembler.toFullDto(updatedEvent);
@@ -121,9 +118,10 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         checkEventIsEditable(event);
 
-        setPlaceOrThrow(eventId, placeId);
+        PlaceInternalDto place = findPlaceOrThrow(placeId);
+        event.setPlaceId(place.getId());
 
-        return eventDtoAssembler.toFullDto(event);
+        return eventDtoAssembler.toFullDto(eventRepository.save(event));
     }
 
     @Override
@@ -134,7 +132,8 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         checkEventIsEditable(event);
 
-        locationClient.removePlace(eventId);
+        event.setPlaceId(null);
+        eventRepository.save(event);
     }
 
     private UserShortDto findUserByIdOrThrow(long userId) {
@@ -150,9 +149,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .orElseThrow(() -> new NotFoundException("Не найдена категория с id: " + categoryId));
     }
 
-    private void setPlaceOrThrow(long eventId, long placeId) {
+    private PlaceInternalDto findPlaceOrThrow(long placeId) {
         try {
-            locationClient.setPlace(eventId, placeId);
+            return locationClient.getPlace(placeId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найдено место: " + placeId);
         }

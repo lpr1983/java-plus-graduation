@@ -5,7 +5,6 @@ import ewm.main.category.mapper.CategoryMapper;
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.EventShortDto;
 import ewm.main.dto.NewEventDto;
-import ewm.main.dto.LocationDto;
 import ewm.main.dto.ShortPlaceDto;
 import ewm.main.dto.UpdateEventAdminRequestDto;
 import ewm.main.dto.UpdateEventUserRequestDto;
@@ -24,6 +23,7 @@ public class EventMapper {
         event.setDescription(dto.getDescription());
         event.setCategory(category);
         event.setEventDate(dto.getEventDate());
+        event.setLocation(LocationMapper.toLocation(dto.getLocation()));
         event.setPaid(dto.getPaid());
         event.setParticipantLimit(dto.getParticipantLimit());
         event.setRequestModeration(dto.getRequestModeration());
@@ -32,10 +32,7 @@ public class EventMapper {
         return event;
     }
 
-    public static EventFullDto toFullDto(Event event,
-                                         UserShortDto initiator,
-                                         LocationDto location,
-                                         ShortPlaceDto place) {
+    public static EventFullDto toFullDto(Event event, UserShortDto initiator, ShortPlaceDto place) {
         EventFullDto dto = new EventFullDto();
         dto.setAnnotation(event.getAnnotation());
         dto.setCategory(CategoryMapper.toDto(event.getCategory()));
@@ -44,7 +41,7 @@ public class EventMapper {
         dto.setEventDate(event.getEventDate());
         dto.setId(event.getId());
         dto.setInitiator(initiator); // обязательное поле
-        dto.setLocation(location);
+        dto.setLocation(LocationMapper.toLocationDto(event.getLocation()));
         dto.setPaid(event.isPaid());
         dto.setParticipantLimit(event.getParticipantLimit());
         dto.setPublishedOn(event.getPublishedOn());
@@ -79,6 +76,9 @@ public class EventMapper {
         if (dto.getPaid() != null) event.setPaid(dto.getPaid());
         if (dto.getParticipantLimit() != null) event.setParticipantLimit(dto.getParticipantLimit());
         if (dto.getEventDate() != null) event.setEventDate(dto.getEventDate());
+        if (dto.getLocation() != null) {
+            event.setLocation(LocationMapper.toLocation(dto.getLocation()));
+        }
         if (dto.getRequestModeration() != null) event.setRequestModeration(dto.getRequestModeration());
     }
 
@@ -92,6 +92,9 @@ public class EventMapper {
         if (dto.getPaid() != null) event.setPaid(dto.getPaid());
         if (dto.getParticipantLimit() != null) event.setParticipantLimit(dto.getParticipantLimit());
         if (dto.getEventDate() != null) event.setEventDate(dto.getEventDate());
+        if (dto.getLocation() != null) {
+            event.setLocation(LocationMapper.toLocation(dto.getLocation()));
+        }
         if (dto.getRequestModeration() != null) event.setRequestModeration(dto.getRequestModeration());
     }
 

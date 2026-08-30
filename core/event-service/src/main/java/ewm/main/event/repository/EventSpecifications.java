@@ -1,7 +1,10 @@
 package ewm.main.event.repository;
 
+import ewm.main.dto.PlaceInternalDto;
 import ewm.main.event.model.Event;
 import ewm.main.event.model.EventState;
+import ewm.main.exception.ValidationException;
+import jakarta.persistence.criteria.Expression;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
@@ -89,12 +92,47 @@ public final class EventSpecifications {
                 cb.lessThanOrEqualTo(root.get("eventDate"), end);
     }
 
-    public static Specification<Event> idIn(List<Long> ids) {
-        if (ids == null) {
+    public static Specification<Event> placeEquals(PlaceInternalDto place) {
+        if (place == null) {
             return null;
         }
 
-        return (root, query, cb) -> root.get("id").in(ids);
+        return (root, query, cb) -> cb.equal(root.get("placeId"), place.getId());
+    }
+
+    public static Specification<Event> inRadius(PlaceInternalDto place, Double radius) {
+        if (place == null || radius == null) {
+            return null;
+        }
+
+        return (root, query, cb) -> {
+            Expression<Double> distance = cb.function(
+                    "distance",
+                    Double.class,
+                    root.get("location").get("lat"),
+                    root.get("location").get("lon"),
+                    cb.literal(place.getLat()),
+                    cb.literal(place.getLon())
+            );
+
+            return cb.lessThanOrEqualTo(distance, radius);
+        };
+    }
+
+    public static Specification<Event> placeSearch(PlaceInternalDto place, Double radius) {
+        if (radius != null && place == null) {
+            throw new ValidationException("Нельзя указывать радиус без указания места");
+        }
+
+        if (place == null) {
+            return null;
+        }
+
+        if (radius != null) {
+            return inRadius(place, radius);
+        }
+
+        return placeEquals(place);
     }
 
 }

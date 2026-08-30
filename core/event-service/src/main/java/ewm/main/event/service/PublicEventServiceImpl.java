@@ -2,6 +2,7 @@ package ewm.main.event.service;
 
 import ewm.main.dto.EventFullDto;
 import ewm.main.dto.EventShortDto;
+import ewm.main.dto.PlaceInternalDto;
 import ewm.main.event.model.Event;
 import ewm.main.event.model.EventSort;
 import ewm.main.event.model.EventState;
@@ -60,10 +61,9 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .and(EventSpecifications.paid(searchParam.getPaid()))
                 .and(EventSpecifications.categoryIdIn(searchParam.getCategories()));
 
-        specification = specification.and(getLocationSpecification(
-                searchParam.getPlaceId(),
-                searchParam.getRadius()
-        ));
+        Long placeId = searchParam.getPlaceId();
+        PlaceInternalDto place = placeId == null ? null : findPlaceOrThrow(placeId);
+        specification = specification.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
 
         EventSort eventSort = EventSort.parse(searchParam.getSort());
 
@@ -112,17 +112,9 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .thenComparing(EventShortDto::getId);
     }
 
-    private Specification<Event> getLocationSpecification(Long placeId, Double radius) {
-        if (radius != null && placeId == null) {
-            throw new ValidationException("Нельзя указывать радиус без указания места");
-        }
-
-        if (placeId == null) {
-            return null;
-        }
-
+    private PlaceInternalDto findPlaceOrThrow(long placeId) {
         try {
-            return EventSpecifications.idIn(locationClient.findEventIds(placeId, radius));
+            return locationClient.getPlace(placeId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найдено место с id: " + placeId);
         }

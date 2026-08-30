@@ -3,6 +3,7 @@ package ewm.main.event.service;
 import ewm.main.category.Category;
 import ewm.main.category.repository.CategoryRepository;
 import ewm.main.dto.EventFullDto;
+import ewm.main.dto.PlaceInternalDto;
 import ewm.main.dto.UpdateEventAdminRequestDto;
 import ewm.main.event.mapper.EventMapper;
 import ewm.main.dto.search.AdminEventSearchParam;
@@ -14,7 +15,6 @@ import ewm.main.event.repository.EventRepository;
 import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.ConflictException;
 import ewm.main.exception.NotFoundException;
-import ewm.main.exception.ValidationException;
 import ewm.main.location.LocationClient;
 import feign.FeignException;
 import lombok.AllArgsConstructor;
@@ -52,10 +52,9 @@ public class AdminEventServiceImpl implements AdminEventService {
                     .and(EventSpecifications.categoryIdIn(searchParam.getCategories()))
                     .and(EventSpecifications.stateIn(searchParam.getStates()));
 
-            spec = spec.and(getLocationSpecification(
-                    searchParam.getPlaceId(),
-                    searchParam.getRadius()
-            ));
+            Long placeId = searchParam.getPlaceId();
+            PlaceInternalDto place = placeId == null ? null : findPlaceOrThrow(placeId);
+            spec = spec.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
         }
 
         List<Event> events = eventRepository.findAll(spec, pageable).getContent();
@@ -111,9 +110,6 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
-        if (request.getLocation() != null) {
-            locationClient.saveLocation(updatedEvent.getId(), request.getLocation());
-        }
 
         log.info("Событие с ID {} обновлено.", eventId);
 
@@ -126,9 +122,10 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Event event = findEventByOrThrow(eventId);
 
-        setPlaceOrThrow(eventId, placeId);
+        PlaceInternalDto place = findPlaceOrThrow(placeId);
+        event.setPlaceId(place.getId());
 
-        return eventDtoAssembler.toFullDto(event);
+        return eventDtoAssembler.toFullDto(eventRepository.save(event));
     }
 
     @Override
@@ -136,7 +133,8 @@ public class AdminEventServiceImpl implements AdminEventService {
         log.info("Отвязка места от события с id: {}", eventId);
         Event event = findEventByOrThrow(eventId);
 
-        locationClient.removePlace(eventId);
+        event.setPlaceId(null);
+        eventRepository.save(event);
     }
 
     private Event findEventByOrThrow(long eventId) {
@@ -144,27 +142,9 @@ public class AdminEventServiceImpl implements AdminEventService {
                 () -> new NotFoundException("Событие с id " + eventId + " не найдено."));
     }
 
-    private void setPlaceOrThrow(long eventId, long placeId) {
+    private PlaceInternalDto findPlaceOrThrow(long placeId) {
         try {
-            locationClient.setPlace(eventId, placeId);
-        } catch (FeignException.NotFound exception) {
-            throw new NotFoundException("Не найдено место: " + placeId);
-        }
-    }
-
-    private Specification<Event> getLocationSpecification(Long placeId, Double radius) {
-        if (radius != null && placeId == null) {
-            throw new ValidationException(
-                    "Нельзя указывать радиус без указания места"
-            );
-        }
-
-        if (placeId == null) {
-            return null;
-        }
-
-        try {
-            return EventSpecifications.idIn(locationClient.findEventIds(placeId, radius));
+            return locationClient.getPlace(placeId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найдено место: " + placeId);
         }
