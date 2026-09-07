@@ -1,7 +1,7 @@
 package ewm.stat.server.controller;
 
-import ewm.stat.dto.HitDto;
-import ewm.stat.dto.StatDto;
+import ewm.stat.server.dto.HitDto;
+import ewm.stat.server.dto.StatDto;
 import ewm.stat.server.service.StatService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
