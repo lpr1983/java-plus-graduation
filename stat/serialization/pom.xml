@@ -11,4 +11,10 @@
     </parent>
 
     <artifactId>serialization</artifactId>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>proto-schemas</module>
+        <module>avro-schemas</module>
+    </modules>
 </project>
