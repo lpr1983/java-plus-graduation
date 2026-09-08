@@ -1,6 +1,7 @@
 package ewm.stats.collector.serialization;
 
 import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.common.errors.SerializationException;
@@ -19,7 +20,7 @@ public class AvroSerializer implements Serializer<SpecificRecordBase> {
 
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             SpecificDatumWriter<SpecificRecordBase> writer = new SpecificDatumWriter<>(data.getSchema());
-            BinaryEncoder encoder = org.apache.avro.io.EncoderFactory.get().binaryEncoder(output, null);
+            BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(output, null);
             writer.write(data, encoder);
             encoder.flush();
             return output.toByteArray();
