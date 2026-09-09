@@ -74,12 +74,14 @@ public class AggregationProcessor {
         for (EventSimilarityAvro similarity : similarities) {
             String key = similarity.getEventA() + ":" + similarity.getEventB();
             ProducerRecord<String, SpecificRecordBase> record = new ProducerRecord<>(eventsSimilarityTopic, key, similarity);
+
             Future<RecordMetadata> sendResult = producer.send(record);
+
             sendResults.add(sendResult);
         }
 
-        // Все события одной калькуляции сначала передаются producer, чтобы Kafka могла отправить их одной пачкой.
-        // Затем синхронно проверяем результат всей пачки до фиксации входного offset.
+        // Отправка всех событий инициируется до ожидания, чтобы не блокироваться после каждого вызова producer.send().
+        // Подтверждение каждого события проверяется до фиксации входного offset.
         for (Future<RecordMetadata> sendResult : sendResults) {
             try {
                 sendResult.get(sendTimeoutMs, TimeUnit.MILLISECONDS);

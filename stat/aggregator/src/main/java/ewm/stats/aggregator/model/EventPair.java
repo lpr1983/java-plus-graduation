@@ -1,11 +1,14 @@
 package ewm.stats.aggregator.model;
 
-public record EventPair(long eventA, long eventB) {
+import java.util.Objects;
 
-    public EventPair {
-        if (eventA >= eventB) {
-            throw new IllegalArgumentException("eventA must be less than eventB");
-        }
+public final class EventPair {
+    private final long eventA;
+    private final long eventB;
+
+    private EventPair(long eventA, long eventB) {
+        this.eventA = eventA;
+        this.eventB = eventB;
     }
 
     public static EventPair of(long firstEventId, long secondEventId) {
@@ -15,5 +18,30 @@ public record EventPair(long eventA, long eventB) {
         return firstEventId < secondEventId
                 ? new EventPair(firstEventId, secondEventId)
                 : new EventPair(secondEventId, firstEventId);
+    }
+
+    public long getEventA() {
+        return eventA;
+    }
+
+    public long getEventB() {
+        return eventB;
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
+        }
+        if (!(object instanceof EventPair)) {
+            return false;
+        }
+        EventPair other = (EventPair) object;
+        return eventA == other.eventA && eventB == other.eventB;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(eventA, eventB);
     }
 }

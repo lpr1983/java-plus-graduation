@@ -11,17 +11,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Реализует формулу сходства мероприятий similarity(A, B) = S_min(A, B) / (sqrt(S(A)) * sqrt(S(B))).
  * Промежуточные суммы, необходимые для последовательного пересчёта результата, хранит в памяти.
- * w(u, A) — максимальный вес действия пользователя u для мероприятия A:
+ * w(u, A) — вес действия пользователя u для мероприятия A:
  * VIEW = 0.4, REGISTER = 0.8, LIKE = 1.0.
  * S(A) = sum(w(u, A)) — сумма весов мероприятия A по всем пользователям.
  * S(B) = sum(w(u, B)) — сумма весов мероприятия B по всем пользователям.
- * S_min(A, B) = sum(min(w(u, A), w(u, B))) — общий вклад пользователей, взаимодействовавших с обоими мероприятиями.
- * Для пользователя без взаимодействия с одним из мероприятий соответствующий вес и вклад в S_min равны нулю.
+ * S_min(A, B) = sum(min(w(u, A), w(u, B))). Для пользователя u определяется вес взаимодействия с A и вес с B.
+ * Из этих двух весов оставляется минимальный. Затем минимальные веса складываются по всем пользователям.
+ * Если пользователь u не взаимодействовал с одним из мероприятий, его вклад в S_min(A, B) равен нулю.
  */
 @Component
 public class SimilarityCalculator {
@@ -29,16 +29,16 @@ public class SimilarityCalculator {
     private static final double REGISTER_WEIGHT = 0.8;
     private static final double LIKE_WEIGHT = 1.0;
 
-    // w(u, A): максимальный вес взаимодействия пользователя u с мероприятием A.
+    // w(u, A) — веса мероприятий для пользователей.
     // Внешний ключ — userId, внутренний ключ — eventId, значение — вес w(u, A).
     private final Map<Long, Map<Long, Double>> userEventWeights = new HashMap<>();
 
-    // S(A) = sum(w(u, A)): сумма максимальных весов всех пользователей для каждого мероприятия A.
-    // Ключ — eventId, значение — сумма S(A).
+    // S(A) — по мероприятиями.
+    // Ключ — eventId, значение — S(A).
     private final Map<Long, Double> eventWeightSums = new HashMap<>();
 
-    // S_min(A, B) = sum(min(w(u, A), w(u, B))): сумма общих вкладов пользователей для каждой пары мероприятий.
-    // Ключ — упорядоченная пара eventId, значение — сумма S_min(A, B).
+    // S_min(A, B) — по парам мероприятий.
+    // Ключ — пара мероприятий, значение — S_min(A, B).
     private final Map<EventPair, Double> minWeightSums = new HashMap<>();
 
     public List<EventSimilarityAvro> update(UserActionAvro action) {
@@ -46,11 +46,13 @@ public class SimilarityCalculator {
         long updatedEventId = action.getEventId();
         double actionWeight = getActionWeight(action.getActionType());
 
-        // Все w(u, eventId) для текущего пользователя u: ключ — eventId, значение — вес.
-        Map<Long, Double> weightsForUser = userEventWeights.computeIfAbsent(userId, ignored -> new TreeMap<>());
+        // w(u, A) — веса мероприятий для текущего пользователя userId.
+        // Ключ — eventId, значение — вес мероприятия для текущего пользователя.
+        Map<Long, Double> weightsForUser = userEventWeights.computeIfAbsent(userId, i -> new HashMap<>());
         double oldEventWeight = weightsForUser.getOrDefault(updatedEventId, 0.0);
 
-        // w_new(u, A) = max(w_old(u, A), actionWeight). Более слабое повторное действие состояние не изменяет.
+        // Если вес нового действия не превышает сохранённый w(u, A),
+        // состояние и коэффициенты сходства не изменяются.
         double newEventWeight = Math.max(oldEventWeight, actionWeight);
         if (Double.compare(newEventWeight, oldEventWeight) == 0) {
             return List.of();
@@ -64,15 +66,16 @@ public class SimilarityCalculator {
 
         List<EventSimilarityAvro> similarities = new ArrayList<>();
         Instant calculationTime = Instant.now();
-        // Пересчитываем только пары с мероприятиями B, с которыми взаимодействовал тот же пользователь u.
-        // Если w(u, B) = 0, вклад пользователя в S_min(A, B) не меняется, поэтому сообщение публиковать не нужно.
+
+        // weightsForUser содержит только мероприятия, с которыми взаимодействовал текущий пользователь.
+        // Поэтому мероприятия B с w(u, B) = 0 не входят в цикл и сообщение для такой пары не формируется.
         for (long otherEventId : weightsForUser.keySet()) {
             if (otherEventId == updatedEventId) {
                 continue;
             }
 
             EventPair pair = EventPair.of(updatedEventId, otherEventId);
-            double otherEventWeight = weightsForUser.getOrDefault(otherEventId, 0.0);
+            double otherEventWeight = weightsForUser.get(otherEventId);
 
             // Delta S_min = min(w_new(u, A), w(u, B)) - min(w_old(u, A), w(u, B)).
             double oldMinWeight = Math.min(oldEventWeight, otherEventWeight);
@@ -82,11 +85,15 @@ public class SimilarityCalculator {
 
             // similarity(A, B) = S_min(A, B) / (sqrt(S(A)) * sqrt(S(B))).
             double otherEventWeightSum = eventWeightSums.get(otherEventId);
+            if (newEventWeightSum <= 0 || otherEventWeightSum <= 0) {
+                throw new IllegalStateException("Event weight sums must be positive: eventId=" + updatedEventId
+                        + ", sum=" + newEventWeightSum + ", eventId=" + otherEventId + ", sum=" + otherEventWeightSum);
+            }
             double similarity = newMinWeightSum / (Math.sqrt(newEventWeightSum) * Math.sqrt(otherEventWeightSum));
 
             similarities.add(EventSimilarityAvro.newBuilder()
-                    .setEventA(pair.eventA())
-                    .setEventB(pair.eventB())
+                    .setEventA(pair.getEventA())
+                    .setEventB(pair.getEventB())
                     .setScore(similarity)
                     .setTimestamp(calculationTime)
                     .build());
