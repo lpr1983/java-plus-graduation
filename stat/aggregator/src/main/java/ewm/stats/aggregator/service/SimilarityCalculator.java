@@ -1,6 +1,7 @@
 package ewm.stats.aggregator.service;
 
 import ewm.stats.aggregator.model.EventPair;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.practicum.ewm.stats.avro.ActionTypeAvro;
 import ru.practicum.ewm.stats.avro.EventSimilarityAvro;
@@ -23,6 +24,7 @@ import java.util.Map;
  * Из этих двух весов оставляется минимальный. Затем минимальные веса складываются по всем пользователям.
  * Если пользователь u не взаимодействовал с одним из мероприятий, его вклад в S_min(A, B) равен нулю.
  */
+@Slf4j
 @Component
 public class SimilarityCalculator {
     private static final double VIEW_WEIGHT = 0.4;
@@ -55,6 +57,8 @@ public class SimilarityCalculator {
         // состояние и коэффициенты сходства не изменяются.
         double newEventWeight = Math.max(oldEventWeight, actionWeight);
         if (Double.compare(newEventWeight, oldEventWeight) == 0) {
+            log.debug("Ignored user action that does not increase weight: userId={}, eventId={}, actionType={}, weight={}",
+                    userId, updatedEventId, action.getActionType(), oldEventWeight);
             return List.of();
         }
 
@@ -90,6 +94,9 @@ public class SimilarityCalculator {
                         + ", sum=" + newEventWeightSum + ", eventId=" + otherEventId + ", sum=" + otherEventWeightSum);
             }
             double similarity = newMinWeightSum / (Math.sqrt(newEventWeightSum) * Math.sqrt(otherEventWeightSum));
+            log.trace("Calculated similarity: eventA={}, eventB={}, minWeightSum={}, eventWeightSum={}, "
+                            + "otherEventWeightSum={}, similarity={}",
+                    pair.getEventA(), pair.getEventB(), newMinWeightSum, newEventWeightSum, otherEventWeightSum, similarity);
 
             similarities.add(EventSimilarityAvro.newBuilder()
                     .setEventA(pair.getEventA())
@@ -99,6 +106,8 @@ public class SimilarityCalculator {
                     .build());
         }
 
+        log.debug("Updated event weight: userId={}, eventId={}, oldWeight={}, newWeight={}, similarities={}",
+                userId, updatedEventId, oldEventWeight, newEventWeight, similarities.size());
         return similarities;
     }
 
