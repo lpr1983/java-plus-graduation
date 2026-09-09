@@ -3,6 +3,7 @@ package ewm.stats.aggregator.service;
 import jakarta.annotation.PreDestroy;
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -53,7 +54,10 @@ public class AggregationProcessor {
         try {
             while (running) {
                 ConsumerRecords<Long, UserActionAvro> records = consumer.poll(pollTimeout);
-                records.forEach(record -> publish(similarityCalculator.update(record.value())));
+                for (ConsumerRecord<Long, UserActionAvro> record : records) {
+                    List<EventSimilarityAvro> similarities = similarityCalculator.update(record.value());
+                    publishAndAwaitCompletion(similarities);
+                }
                 if (!records.isEmpty()) {
                     consumer.commitSync();
                 }
@@ -65,12 +69,13 @@ public class AggregationProcessor {
         }
     }
 
-    private void publish(List<EventSimilarityAvro> similarities) {
+    private void publishAndAwaitCompletion(List<EventSimilarityAvro> similarities) {
         List<Future<RecordMetadata>> sendResults = new ArrayList<>(similarities.size());
         for (EventSimilarityAvro similarity : similarities) {
             String key = similarity.getEventA() + ":" + similarity.getEventB();
             ProducerRecord<String, SpecificRecordBase> record = new ProducerRecord<>(eventsSimilarityTopic, key, similarity);
-            sendResults.add(producer.send(record));
+            Future<RecordMetadata> sendResult = producer.send(record);
+            sendResults.add(sendResult);
         }
 
         // Все события одной калькуляции сначала передаются producer, чтобы Kafka могла отправить их одной пачкой.
