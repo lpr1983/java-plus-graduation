@@ -1,7 +1,7 @@
 package ewm.stats.analyzer.service;
 
-import ewm.stats.analyzer.model.EventSimilarity;
-import ewm.stats.analyzer.model.UserInteraction;
+import ewm.stats.analyzer.mapper.EventSimilarityMapper;
+import ewm.stats.analyzer.mapper.UserInteractionMapper;
 import ewm.stats.analyzer.repository.EventSimilarityRepository;
 import ewm.stats.analyzer.repository.UserInteractionRepository;
 import jakarta.annotation.PreDestroy;
@@ -12,7 +12,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.errors.WakeupException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import ru.practicum.ewm.stats.avro.ActionTypeAvro;
 import ru.practicum.ewm.stats.avro.EventSimilarityAvro;
 import ru.practicum.ewm.stats.avro.UserActionAvro;
 
@@ -22,14 +21,12 @@ import java.util.List;
 @Slf4j
 @Component
 public class AnalyzerProcessor {
-    private static final double VIEW_WEIGHT = 0.4;
-    private static final double REGISTER_WEIGHT = 0.8;
-    private static final double LIKE_WEIGHT = 1.0;
-
     private final Consumer<Long, UserActionAvro> userActionConsumer;
     private final Consumer<String, EventSimilarityAvro> eventSimilarityConsumer;
     private final UserInteractionRepository userInteractionRepository;
     private final EventSimilarityRepository eventSimilarityRepository;
+    private final UserInteractionMapper userInteractionMapper;
+    private final EventSimilarityMapper eventSimilarityMapper;
     private final String userActionsTopic;
     private final String eventSimilaritiesTopic;
     private final Duration pollTimeout;
@@ -39,6 +36,8 @@ public class AnalyzerProcessor {
                              Consumer<String, EventSimilarityAvro> eventSimilarityConsumer,
                              UserInteractionRepository userInteractionRepository,
                              EventSimilarityRepository eventSimilarityRepository,
+                             UserInteractionMapper userInteractionMapper,
+                             EventSimilarityMapper eventSimilarityMapper,
                              @Value("${kafka.topic.user-actions}") String userActionsTopic,
                              @Value("${kafka.topic.events-similarity}") String eventSimilaritiesTopic,
                              @Value("${kafka.consumer.poll-timeout-ms}") long pollTimeoutMs) {
@@ -46,6 +45,8 @@ public class AnalyzerProcessor {
         this.eventSimilarityConsumer = eventSimilarityConsumer;
         this.userInteractionRepository = userInteractionRepository;
         this.eventSimilarityRepository = eventSimilarityRepository;
+        this.userInteractionMapper = userInteractionMapper;
+        this.eventSimilarityMapper = eventSimilarityMapper;
         this.userActionsTopic = userActionsTopic;
         this.eventSimilaritiesTopic = eventSimilaritiesTopic;
         this.pollTimeout = Duration.ofMillis(pollTimeoutMs);
@@ -60,11 +61,7 @@ public class AnalyzerProcessor {
                 processUserActions();
                 processEventSimilarities();
             }
-        } catch (WakeupException exception) {
-            if (running) {
-                log.error("Analyzer consumer was unexpectedly woken up", exception);
-                throw exception;
-            }
+        } catch (WakeupException ignored) {
         } finally {
             log.info("Analyzer processor stopped");
         }
@@ -73,10 +70,7 @@ public class AnalyzerProcessor {
     private void processUserActions() {
         ConsumerRecords<Long, UserActionAvro> records = userActionConsumer.poll(pollTimeout);
         for (ConsumerRecord<Long, UserActionAvro> record : records) {
-            UserActionAvro action = record.value();
-            UserInteraction interaction = new UserInteraction(
-                    action.getUserId(), action.getEventId(), getActionWeight(action.getActionType()), action.getTimestamp());
-            userInteractionRepository.save(interaction);
+            userInteractionRepository.save(userInteractionMapper.toModel(record.value()));
         }
         if (!records.isEmpty()) {
             userActionConsumer.commitSync();
@@ -87,22 +81,12 @@ public class AnalyzerProcessor {
     private void processEventSimilarities() {
         ConsumerRecords<String, EventSimilarityAvro> records = eventSimilarityConsumer.poll(pollTimeout);
         for (ConsumerRecord<String, EventSimilarityAvro> record : records) {
-            EventSimilarityAvro similarity = record.value();
-            eventSimilarityRepository.save(EventSimilarity.of(similarity.getEventA(), similarity.getEventB(),
-                    similarity.getScore(), similarity.getTimestamp()));
+            eventSimilarityRepository.save(eventSimilarityMapper.toModel(record.value()));
         }
         if (!records.isEmpty()) {
             eventSimilarityConsumer.commitSync();
             log.debug("Saved and committed {} event similarities", records.count());
         }
-    }
-
-    private double getActionWeight(ActionTypeAvro actionType) {
-        return switch (actionType) {
-            case VIEW -> VIEW_WEIGHT;
-            case REGISTER -> REGISTER_WEIGHT;
-            case LIKE -> LIKE_WEIGHT;
-        };
     }
 
     @PreDestroy
