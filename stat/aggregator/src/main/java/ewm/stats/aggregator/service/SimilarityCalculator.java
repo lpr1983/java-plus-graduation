@@ -35,11 +35,11 @@ public class SimilarityCalculator {
     // Внешний ключ — userId, внутренний ключ — eventId, значение — вес w(u, A).
     private final Map<Long, Map<Long, Double>> userEventWeights = new HashMap<>();
 
-    // S(A) — по мероприятиями.
+    // S(A) по мероприятиям.
     // Ключ — eventId, значение — S(A).
     private final Map<Long, Double> eventWeightSums = new HashMap<>();
 
-    // S_min(A, B) — по парам мероприятий.
+    // S_min(A, B) по парам мероприятий.
     // Ключ — пара мероприятий, значение — S_min(A, B).
     private final Map<EventPair, Double> minWeightSums = new HashMap<>();
 
