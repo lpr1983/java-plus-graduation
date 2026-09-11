@@ -3,8 +3,7 @@ package ewm.main.event.model;
 import ewm.main.exception.ValidationException;
 
 public enum EventSort {
-    EVENT_DATE,
-    VIEWS;
+    EVENT_DATE;
 
     public static EventSort parse(String value) {
         try {

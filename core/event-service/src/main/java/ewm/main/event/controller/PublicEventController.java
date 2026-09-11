@@ -5,8 +5,7 @@ import ewm.main.dto.EventShortDto;
 import ewm.main.dto.search.PageParam;
 import ewm.main.dto.search.PublicEventSearchParam;
 import ewm.main.event.service.PublicEventService;
-import ewm.main.stat.StatService;
-import jakarta.servlet.http.HttpServletRequest;
+import ewm.stats.client.CollectorClient;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,23 +19,31 @@ import java.util.List;
 @AllArgsConstructor
 public class PublicEventController {
     private final PublicEventService publicEventService;
-    private final StatService statService;
+    private final CollectorClient collectorClient;
 
     @GetMapping
     public List<EventShortDto> getEvents(@Valid @ModelAttribute PublicEventSearchParam searchParam,
-                                         @Valid @ModelAttribute PageParam pageParam,
-                                         HttpServletRequest request) {
-
-        statService.saveHit(request.getRequestURI(), request.getRemoteAddr());
-
+                                         @Valid @ModelAttribute PageParam pageParam) {
         return publicEventService.getEvents(searchParam, pageParam);
     }
 
+    @GetMapping("/recommendations")
+    public List<EventShortDto> getRecommendations(@RequestHeader("X-EWM-USER-ID") long userId,
+                                                   @RequestParam(defaultValue = "10") int maxResults) {
+        return publicEventService.getRecommendations(userId, maxResults);
+    }
+
+    @PutMapping("/{eventId}/like")
+    public void likeEvent(@PathVariable long eventId,
+                          @RequestHeader("X-EWM-USER-ID") long userId) {
+        publicEventService.likeEvent(userId, eventId);
+    }
+
     @GetMapping("/{id}")
-    public EventFullDto getEventById(@PathVariable Long id, HttpServletRequest request) {
-
-        statService.saveHit(request.getRequestURI(), request.getRemoteAddr());
-
-        return publicEventService.getEventById(id);
+    public EventFullDto getEventById(@PathVariable Long id,
+                                     @RequestHeader("X-EWM-USER-ID") long userId) {
+        EventFullDto event = publicEventService.getEventById(id);
+        collectorClient.sendView(userId, id);
+        return event;
     }
 }

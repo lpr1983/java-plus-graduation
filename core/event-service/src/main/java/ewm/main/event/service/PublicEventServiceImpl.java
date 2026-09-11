@@ -13,6 +13,10 @@ import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.NotFoundException;
 import ewm.main.exception.ValidationException;
 import ewm.main.location.LocationClient;
+import ewm.main.request.RequestClient;
+import ewm.stats.client.AnalyzerClient;
+import ewm.stats.client.CollectorClient;
+import ewm.stats.client.model.RecommendedEvent;
 import feign.FeignException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +27,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -33,6 +38,9 @@ public class PublicEventServiceImpl implements PublicEventService {
     private final EventRepository eventRepository;
     private final EventDtoAssembler eventDtoAssembler;
     private final LocationClient locationClient;
+    private final AnalyzerClient analyzerClient;
+    private final RequestClient requestClient;
+    private final CollectorClient collectorClient;
 
     @Override
     public List<EventShortDto> getEvents(PublicEventSearchParam searchParam, PageParam pageParam) {
@@ -65,12 +73,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         PlaceInternalDto place = placeId == null ? null : findPlaceOrThrow(placeId);
         specification = specification.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
 
-        EventSort eventSort = EventSort.parse(searchParam.getSort());
-
-        if (eventSort == EventSort.VIEWS) {
-            return getEventsSortedByViews(specification, pageParam);
-        }
-
+        EventSort.parse(searchParam.getSort());
         return getEventsSortedByEventDate(specification, pageParam);
     }
 
@@ -89,35 +92,54 @@ public class PublicEventServiceImpl implements PublicEventService {
         return eventDtoAssembler.toShortDtoListForRead(events);
     }
 
-    private List<EventShortDto> getEventsSortedByViews(Specification<Event> specification,
-                                                       PageParam pageParam) {
-        List<Event> events = eventRepository.findAll(specification);
-        log.info("Найдено {} событий для сортировки по просмотрам.", events.size());
-
-        List<EventShortDto> dtos = eventDtoAssembler.toShortDtoListForRead(events);
-
-        return dtos.stream()
-                .sorted(viewsComparator())
-                .skip(pageParam.getFrom())
-                .limit(pageParam.getSize())
-                .toList();
-    }
-
-    private Comparator<EventShortDto> viewsComparator() {
-        return Comparator
-                .comparing(
-                        EventShortDto::getViews,
-                        Comparator.nullsLast(Comparator.reverseOrder())
-                )
-                .thenComparing(EventShortDto::getId);
-    }
-
     private PlaceInternalDto findPlaceOrThrow(long placeId) {
         try {
             return locationClient.getPlace(placeId);
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найдено место с id: " + placeId);
         }
+    }
+
+    @Override
+    public List<EventShortDto> getRecommendations(long userId, int maxResults) {
+        if (maxResults <= 0) {
+            throw new ValidationException("maxResults должен быть положительным");
+        }
+
+        List<RecommendedEvent> recommendations = analyzerClient.getRecommendationsForUser(userId, maxResults);
+        List<Long> eventIds = recommendations.stream().map(RecommendedEvent::eventId).toList();
+
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Event> events = eventRepository.findAllByIdInAndState(eventIds, EventState.PUBLISHED);
+        Map<Long, Event> eventsById = new HashMap<>();
+        events.forEach(event -> eventsById.put(event.getId(), event));
+
+        List<Event> orderedEvents = eventIds.stream()
+                .map(eventsById::get)
+                .filter(event -> event != null)
+                .toList();
+
+        log.info("Сформированы рекомендации для пользователя {}: запрошено {}, найдено событий {}",
+                userId, recommendations.size(), orderedEvents.size());
+        return eventDtoAssembler.toShortDtoListForRead(orderedEvents);
+    }
+
+    @Override
+    public void likeEvent(long userId, long eventId) {
+        eventRepository.findOneByIdAndState(eventId, EventState.PUBLISHED)
+                .orElseThrow(() -> new NotFoundException(
+                        "Событие с id: " + eventId + " не найдено или недоступно"
+                ));
+
+        if (!requestClient.hasConfirmedParticipation(userId, eventId)) {
+            throw new ValidationException("Пользователь может лайкать только посещённые мероприятия");
+        }
+
+        collectorClient.sendLike(userId, eventId);
+        log.info("Пользователь {} поставил лайк мероприятию {}", userId, eventId);
     }
 
     @Override

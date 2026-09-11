@@ -29,4 +29,10 @@ public class InternalRequestController {
                 .map(ConfirmedRequestsCountMapper::toDto)
                 .toList();
     }
+
+    @GetMapping("/confirmed-participation")
+    public boolean hasConfirmedParticipation(@RequestParam("userId") long userId,
+                                              @RequestParam("eventId") long eventId) {
+        return requestRepository.existsByRequesterIdAndEventIdAndStatus(userId, eventId, RequestStatus.CONFIRMED);
+    }
 }

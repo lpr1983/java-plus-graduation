@@ -1166,15 +1166,14 @@
             }
           },
           {
-            "description": "Вариант сортировки: по дате события или по количеству просмотров",
+            "description": "Вариант сортировки по дате события",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "type": "string",
               "enum": [
-                "EVENT_DATE",
-                "VIEWS"
+                "EVENT_DATE"
               ]
             }
           },
@@ -1262,15 +1261,141 @@
         ]
       }
     },
+    "/events/recommendations": {
+      "get": {
+        "description": "Возвращает персональные рекомендации опубликованных мероприятий",
+        "operationId": "getRecommendations",
+        "parameters": [
+          {
+            "description": "id пользователя, для которого формируются рекомендации",
+            "in": "header",
+            "name": "X-EWM-USER-ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "description": "Максимальное количество рекомендаций",
+            "in": "query",
+            "name": "maxResults",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventShortDto"
+                  }
+                }
+              }
+            },
+            "description": "Рекомендации сформированы"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Некорректное значение maxResults"
+          }
+        },
+        "summary": "Получение рекомендаций мероприятий для пользователя",
+        "tags": [
+          "Public: События"
+        ]
+      }
+    },
+    "/events/{eventId}/like": {
+      "put": {
+        "description": "Лайк разрешён только пользователю с подтверждённой заявкой на участие в мероприятии",
+        "operationId": "likeEvent",
+        "parameters": [
+          {
+            "description": "id мероприятия",
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "description": "id пользователя, поставившего лайк",
+            "in": "header",
+            "name": "X-EWM-USER-ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Лайк отправлен"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Пользователь не является подтверждённым участником мероприятия"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Опубликованное мероприятие не найдено"
+          }
+        },
+        "summary": "Поставить лайк мероприятию",
+        "tags": [
+          "Public: События"
+        ]
+      }
+    },
     "/events/{id}": {
       "get": {
-        "description": "Обратите внимание:\n- событие должно быть опубликовано\n- информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов\n- информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики\n\nВ случае, если события с заданным id не найдено, возвращает статус код 404",
+        "description": "Обратите внимание:\n- событие должно быть опубликовано\n- информация о событии должна включать количество подтвержденных запросов\n- просмотр события нужно отправить в Collector от имени пользователя из заголовка X-EWM-USER-ID\n\nВ случае, если события с заданным id не найдено, возвращает статус код 404",
         "operationId": "getEvent_1",
         "parameters": [
           {
             "description": "id события",
             "in": "path",
             "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "description": "id пользователя, просматривающего событие",
+            "in": "header",
+            "name": "X-EWM-USER-ID",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2726,8 +2851,8 @@
                   "name": "Фёдоров Матвей"
                 },
                 "paid": true,
-                "title": "Знаменитое шоу 'Летающая кукуруза'",
-                "views": 999
+                "rating": 4.3,
+                "title": "Знаменитое шоу 'Летающая кукуруза'"
               },
               {
                 "annotation": "За почти три десятилетия группа 'Java Core' закрепились на сцене как группа, объединяющая поколения.",
@@ -2743,8 +2868,8 @@
                   "name": "Паша Петров"
                 },
                 "paid": true,
-                "title": "Концерт рок-группы 'Java Core'",
-                "views": 991
+                "rating": 3.8,
+                "title": "Концерт рок-группы 'Java Core'"
               }
             ],
             "items": {
@@ -2778,6 +2903,7 @@
           "initiator",
           "location",
           "paid",
+          "rating",
           "title"
         ],
         "type": "object",
@@ -2846,6 +2972,12 @@
             "example": true,
             "default": true
           },
+          "rating": {
+            "type": "number",
+            "description": "Сумма максимальных весов взаимодействий пользователей с мероприятием",
+            "format": "double",
+            "example": 4.3
+          },
           "state": {
             "type": "string",
             "description": "Список состояний жизненного цикла события",
@@ -2860,12 +2992,6 @@
             "type": "string",
             "description": "Заголовок",
             "example": "Знаменитое шоу 'Летающая кукуруза'"
-          },
-          "views": {
-            "type": "integer",
-            "description": "Количество просмотрев события",
-            "format": "int64",
-            "example": 999
           },
           "place": {
             "$ref": "#/components/schemas/ShortPlaceDto"
@@ -2899,8 +3025,8 @@
           "participantLimit": 10,
           "requestModeration": true,
           "confirmedRequests": 5,
-          "state": "PUBLISHED",
-          "views": 999
+          "rating": 4.3,
+          "state": "PUBLISHED"
         }
       },
       "EventRequestStatusUpdateRequest": {
@@ -2957,6 +3083,7 @@
           "eventDate",
           "initiator",
           "paid",
+          "rating",
           "title"
         ],
         "type": "object",
@@ -2994,16 +3121,16 @@
             "description": "Нужно ли оплачивать участие",
             "example": true
           },
+          "rating": {
+            "type": "number",
+            "description": "Сумма максимальных весов взаимодействий пользователей с мероприятием",
+            "format": "double",
+            "example": 4.3
+          },
           "title": {
             "type": "string",
             "description": "Заголовок",
             "example": "Знаменитое шоу 'Летающая кукуруза'"
-          },
-          "views": {
-            "type": "integer",
-            "description": "Количество просмотрев события",
-            "format": "int64",
-            "example": 999
           }
         },
         "description": "Краткая информация о событии",
@@ -3022,8 +3149,8 @@
               "name": "Фёдоров Матвей"
             },
             "paid": true,
-            "title": "Знаменитое шоу 'Летающая кукуруза'",
-            "views": 999
+            "rating": 4.3,
+            "title": "Знаменитое шоу 'Летающая кукуруза'"
           },
           {
             "annotation": "За почти три десятилетия группа 'Java Core' закрепились на сцене как группа, объединяющая поколения.",
@@ -3039,8 +3166,8 @@
               "name": "Паша Петров"
             },
             "paid": true,
-            "title": "Концерт рок-группы 'Java Core'",
-            "views": 991
+            "rating": 3.8,
+            "title": "Концерт рок-группы 'Java Core'"
           }
         ]
       },
