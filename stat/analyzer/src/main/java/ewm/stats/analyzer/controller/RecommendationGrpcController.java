@@ -14,7 +14,6 @@ import ru.practicum.ewm.stats.proto.SimilarEventsRequestProto;
 import ru.practicum.ewm.stats.proto.UserPredictionsRequestProto;
 
 import java.util.List;
-import java.util.function.Supplier;
 
 @Slf4j
 @GrpcService
@@ -31,64 +30,95 @@ public class RecommendationGrpcController extends RecommendationsControllerGrpc.
     @Override
     public void getRecommendationsForUser(UserPredictionsRequestProto request,
                                           StreamObserver<RecommendedEventProto> responseObserver) {
-        execute("user recommendations", responseObserver, () -> {
-            validateId(request.getUserId(), "userId");
+        try {
             validateMaxResults(request.getMaxResults());
+
             log.debug("Getting recommendations: userId={}, maxResults={}",
                     request.getUserId(), request.getMaxResults());
-            return recommendationService.getRecommendationsForUser(request.getUserId(), request.getMaxResults());
-        });
-    }
 
-    @Override
-    public void getSimilarEvents(SimilarEventsRequestProto request,
-                                 StreamObserver<RecommendedEventProto> responseObserver) {
-        execute("similar events", responseObserver, () -> {
-            validateId(request.getEventId(), "eventId");
-            validateId(request.getUserId(), "userId");
-            validateMaxResults(request.getMaxResults());
-            log.debug("Getting similar events: eventId={}, userId={}, maxResults={}",
-                    request.getEventId(), request.getUserId(), request.getMaxResults());
-            return recommendationService.getSimilarEvents(
-                    request.getEventId(), request.getUserId(), request.getMaxResults());
-        });
-    }
+            List<RecommendedEvent> recommendations = recommendationService.getRecommendationsForUser(
+                    request.getUserId(), request.getMaxResults());
 
-    @Override
-    public void getInteractionsCount(InteractionsCountRequestProto request,
-                                     StreamObserver<RecommendedEventProto> responseObserver) {
-        execute("interaction counts", responseObserver, () -> {
-            request.getEventIdList().forEach(eventId -> validateId(eventId, "eventId"));
-            log.debug("Getting interaction counts for {} events", request.getEventIdCount());
-            return recommendationService.getInteractionsCount(request.getEventIdList());
-        });
-    }
+            for (RecommendedEvent recommendation : recommendations) {
+                responseObserver.onNext(recommendedEventMapper.toProto(recommendation));
+            }
 
-    private void execute(String operation, StreamObserver<RecommendedEventProto> responseObserver,
-                         Supplier<List<RecommendedEvent>> action) {
-        try {
-            List<RecommendedEvent> recommendations = action.get();
-            recommendations.stream().map(recommendedEventMapper::toProto).forEach(responseObserver::onNext);
             responseObserver.onCompleted();
-            log.debug("Completed {} request: results={}", operation, recommendations.size());
+            log.debug("Completed user recommendations request: results={}", recommendations.size());
         } catch (IllegalArgumentException exception) {
-            log.warn("Rejected {} request: {}", operation, exception.getMessage());
+            log.warn("Rejected user recommendations request: {}", exception.getMessage());
             responseObserver.onError(Status.INVALID_ARGUMENT
                     .withDescription(exception.getMessage())
                     .withCause(exception)
                     .asRuntimeException());
         } catch (Exception exception) {
-            log.error("Failed to get {}", operation, exception);
+            log.error("Failed to get user recommendations", exception);
             responseObserver.onError(Status.INTERNAL
-                    .withDescription("Failed to get " + operation)
+                    .withDescription("Failed to get user recommendations")
                     .withCause(exception)
                     .asRuntimeException());
         }
     }
 
-    private void validateId(long id, String fieldName) {
-        if (id <= 0) {
-            throw new IllegalArgumentException(fieldName + " must be positive");
+    @Override
+    public void getSimilarEvents(SimilarEventsRequestProto request,
+                                 StreamObserver<RecommendedEventProto> responseObserver) {
+        try {
+            validateMaxResults(request.getMaxResults());
+
+            log.debug("Getting similar events: eventId={}, userId={}, maxResults={}",
+                    request.getEventId(), request.getUserId(), request.getMaxResults());
+
+            List<RecommendedEvent> recommendations = recommendationService.getSimilarEvents(
+                    request.getEventId(), request.getUserId(), request.getMaxResults());
+
+            for (RecommendedEvent recommendation : recommendations) {
+                responseObserver.onNext(recommendedEventMapper.toProto(recommendation));
+            }
+
+            responseObserver.onCompleted();
+            log.debug("Completed similar events request: results={}", recommendations.size());
+        } catch (IllegalArgumentException exception) {
+            log.warn("Rejected similar events request: {}", exception.getMessage());
+            responseObserver.onError(Status.INVALID_ARGUMENT
+                    .withDescription(exception.getMessage())
+                    .withCause(exception)
+                    .asRuntimeException());
+        } catch (Exception exception) {
+            log.error("Failed to get similar events", exception);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to get similar events")
+                    .withCause(exception)
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void getInteractionsCount(InteractionsCountRequestProto request,
+                                     StreamObserver<RecommendedEventProto> responseObserver) {
+        try {
+            log.debug("Getting interaction counts for {} events", request.getEventIdCount());
+
+            List<RecommendedEvent> recommendations = recommendationService.getInteractionsCount(request.getEventIdList());
+
+            for (RecommendedEvent recommendation : recommendations) {
+                responseObserver.onNext(recommendedEventMapper.toProto(recommendation));
+            }
+
+            responseObserver.onCompleted();
+            log.debug("Completed interaction counts request: results={}", recommendations.size());
+        } catch (IllegalArgumentException exception) {
+            log.warn("Rejected interaction counts request: {}", exception.getMessage());
+            responseObserver.onError(Status.INVALID_ARGUMENT
+                    .withDescription(exception.getMessage())
+                    .withCause(exception)
+                    .asRuntimeException());
+        } catch (Exception exception) {
+            log.error("Failed to get interaction counts", exception);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to get interaction counts")
+                    .withCause(exception)
+                    .asRuntimeException());
         }
     }
 

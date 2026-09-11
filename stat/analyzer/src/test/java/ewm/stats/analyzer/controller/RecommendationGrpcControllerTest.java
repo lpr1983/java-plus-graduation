@@ -91,10 +91,10 @@ class RecommendationGrpcControllerTest {
     }
 
     @Test
-    void shouldRejectInvalidRequest() {
+    void shouldRejectInvalidMaxResults() {
         UserPredictionsRequestProto request = UserPredictionsRequestProto.newBuilder()
-                .setUserId(0)
-                .setMaxResults(10)
+                .setUserId(10)
+                .setMaxResults(0)
                 .build();
 
         controller.getRecommendationsForUser(request, responseObserver);

@@ -8,6 +8,7 @@ public class RecommendedEvent {
         if (!Double.isFinite(score) || score < 0) {
             throw new IllegalArgumentException("Recommendation score must be a finite non-negative number");
         }
+
         this.eventId = eventId;
         this.score = score;
     }

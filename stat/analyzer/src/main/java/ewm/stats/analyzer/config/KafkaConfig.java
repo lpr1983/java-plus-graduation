@@ -26,6 +26,7 @@ public class KafkaConfig {
         Properties properties = consumerProperties(bootstrapServers, clientId, groupId);
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class);
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserActionDeserializer.class);
+
         return new KafkaConsumer<>(properties);
     }
 
@@ -37,6 +38,7 @@ public class KafkaConfig {
         Properties properties = consumerProperties(bootstrapServers, clientId, groupId);
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, EventSimilarityDeserializer.class);
+
         return new KafkaConsumer<>(properties);
     }
 
@@ -47,6 +49,7 @@ public class KafkaConfig {
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
         return properties;
     }
 }

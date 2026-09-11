@@ -13,6 +13,7 @@ public class EventSimilarity {
         if (!Double.isFinite(score) || score < 0) {
             throw new IllegalArgumentException("Similarity score must be a finite non-negative number");
         }
+
         this.eventA = eventA;
         this.eventB = eventB;
         this.score = score;
@@ -23,8 +24,10 @@ public class EventSimilarity {
         if (firstEventId == secondEventId) {
             throw new IllegalArgumentException("Similarity requires two different events");
         }
+
         long eventA = Math.min(firstEventId, secondEventId);
         long eventB = Math.max(firstEventId, secondEventId);
+
         return new EventSimilarity(eventA, eventB, score, timestamp);
     }
 
@@ -48,9 +51,11 @@ public class EventSimilarity {
         if (eventId == eventA) {
             return eventB;
         }
+
         if (eventId == eventB) {
             return eventA;
         }
+
         throw new IllegalArgumentException("Event " + eventId + " is not part of the similarity pair");
     }
 }

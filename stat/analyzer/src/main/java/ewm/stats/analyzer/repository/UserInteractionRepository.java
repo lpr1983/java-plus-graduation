@@ -1,7 +1,6 @@
 package ewm.stats.analyzer.repository;
 
 import ewm.stats.analyzer.model.UserInteraction;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -62,8 +61,9 @@ public class UserInteractionRepository {
                 .addValue("eventId", interaction.getEventId())
                 .addValue("weight", interaction.getWeight())
                 .addValue("interactionTime", Timestamp.from(interaction.getTimestamp()));
+
         if (jdbcTemplate.update(UPDATE_SQL, parameters) == 0) {
-            insertOrRetryUpdate(parameters);
+            jdbcTemplate.update(INSERT_SQL, parameters);
         }
     }
 
@@ -71,6 +71,7 @@ public class UserInteractionRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("userId", userId)
                 .addValue("limit", limit);
+
         return jdbcTemplate.query(FIND_RECENT_SQL, parameters, ROW_MAPPER);
     }
 
@@ -78,9 +79,11 @@ public class UserInteractionRepository {
         if (eventIds.isEmpty()) {
             return List.of();
         }
+
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("userId", userId)
                 .addValue("eventIds", eventIds);
+
         return jdbcTemplate.query(FIND_BY_EVENT_IDS_SQL, parameters, ROW_MAPPER);
     }
 
@@ -88,20 +91,15 @@ public class UserInteractionRepository {
         if (eventIds.isEmpty()) {
             return Map.of();
         }
+
         MapSqlParameterSource parameters = new MapSqlParameterSource("eventIds", eventIds);
         Map<Long, Double> weightSums = new LinkedHashMap<>();
         List<Map.Entry<Long, Double>> rows = jdbcTemplate.query(SUM_WEIGHTS_SQL, parameters, (resultSet, rowNumber) ->
                 Map.entry(resultSet.getLong("event_id"), resultSet.getDouble("weight_sum")));
-        rows.forEach(row -> weightSums.put(row.getKey(), row.getValue()));
-        return weightSums;
-    }
 
-    private void insertOrRetryUpdate(MapSqlParameterSource parameters) {
-        try {
-            jdbcTemplate.update(INSERT_SQL, parameters);
-        } catch (DuplicateKeyException exception) {
-            jdbcTemplate.update(UPDATE_SQL, parameters);
-        }
+        rows.forEach(row -> weightSums.put(row.getKey(), row.getValue()));
+
+        return weightSums;
     }
 
     private static class UserInteractionRowMapper implements RowMapper<UserInteraction> {

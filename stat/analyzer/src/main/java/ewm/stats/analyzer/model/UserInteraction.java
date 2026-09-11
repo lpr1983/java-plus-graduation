@@ -13,6 +13,7 @@ public class UserInteraction {
         if (!Double.isFinite(weight) || weight < 0) {
             throw new IllegalArgumentException("Interaction weight must be a finite non-negative number");
         }
+
         this.userId = userId;
         this.eventId = eventId;
         this.weight = weight;

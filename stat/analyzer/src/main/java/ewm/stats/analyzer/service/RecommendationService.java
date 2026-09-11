@@ -9,14 +9,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class RecommendationService {
-    private static final int INTERACTED_SIMILAR_EVENTS_LIMIT = 20;
+    private static final int NEAREST_NEIGHBORS_LIMIT = 20;
 
     private final UserInteractionRepository userInteractionRepository;
     private final EventSimilarityRepository eventSimilarityRepository;
@@ -31,23 +30,32 @@ public class RecommendationService {
         if (maxResults <= 0) {
             return List.of();
         }
+
         List<UserInteraction> recentInteractions = userInteractionRepository.findRecentByUserId(userId, maxResults);
+
         if (recentInteractions.isEmpty()) {
             return List.of();
         }
-        Collection<Long> recentEventIds = recentInteractions.stream()
+
+        List<Long> recentEventIds = recentInteractions.stream()
                 .map(UserInteraction::getEventId)
-                .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
+                .toList();
+
         List<Long> candidateIds = eventSimilarityRepository.findRecommendationCandidateIds(
                 recentEventIds, userId, maxResults);
-        List<RecommendedEvent> recommendations = new ArrayList<>(candidateIds.size());
+
+        List<RecommendedEvent> recommendations = new ArrayList<>();
         for (long candidateId : candidateIds) {
-            recommendations.add(new RecommendedEvent(candidateId, predictScore(candidateId, userId)));
+            double predictedScore = predictScore(candidateId, userId);
+            RecommendedEvent recommendation = new RecommendedEvent(candidateId, predictedScore);
+            recommendations.add(recommendation);
         }
+
         recommendations.sort((first, second) -> {
             int byScore = Double.compare(second.getScore(), first.getScore());
             return byScore != 0 ? byScore : Long.compare(first.getEventId(), second.getEventId());
         });
+
         return recommendations;
     }
 
@@ -55,13 +63,23 @@ public class RecommendationService {
         if (maxResults <= 0) {
             return List.of();
         }
-        return eventSimilarityRepository.findNotInteractedByEventId(eventId, userId, maxResults).stream()
-                .map(similarity -> new RecommendedEvent(similarity.getOtherEventId(eventId), similarity.getScore()))
-                .toList();
+
+        List<EventSimilarity> similarities = eventSimilarityRepository.findNotInteractedByEventId(
+                eventId, userId, maxResults);
+
+        List<RecommendedEvent> recommendations = new ArrayList<>();
+        for (EventSimilarity similarity : similarities) {
+            long similarEventId = similarity.getOtherEventId(eventId);
+            RecommendedEvent recommendation = new RecommendedEvent(similarEventId, similarity.getScore());
+            recommendations.add(recommendation);
+        }
+
+        return recommendations;
     }
 
     public List<RecommendedEvent> getInteractionsCount(Collection<Long> eventIds) {
         Map<Long, Double> weightSums = userInteractionRepository.sumWeightsByEventIds(eventIds);
+
         return eventIds.stream()
                 .distinct()
                 .filter(weightSums::containsKey)
@@ -72,21 +90,31 @@ public class RecommendationService {
     /**
      * Рассчитывает прогноз для мероприятия A по формуле
      * R(u, A) = sum(similarity(A, B) * w(u, B)) / sum(similarity(A, B)).
-     * В расчёт входят до 20 наиболее похожих мероприятий B, с которыми взаимодействовал пользователь u.
+     * В расчёт входят K ближайших мероприятий B, с которыми взаимодействовал пользователь u.
      */
     private double predictScore(long eventId, long userId) {
         List<EventSimilarity> similarities = eventSimilarityRepository.findInteractedByEventId(
-                eventId, userId, INTERACTED_SIMILAR_EVENTS_LIMIT);
-        Collection<Long> interactedEventIds = similarities.stream()
-                .map(similarity -> similarity.getOtherEventId(eventId))
-                .toList();
-        Map<Long, Double> weights = userInteractionRepository.findByUserIdAndEventIds(userId, interactedEventIds).stream()
-                .collect(Collectors.toMap(UserInteraction::getEventId, UserInteraction::getWeight));
+                eventId, userId, NEAREST_NEIGHBORS_LIMIT);
+
+        List<Long> interactedEventIds = new ArrayList<>();
+        for (EventSimilarity similarity : similarities) {
+            interactedEventIds.add(similarity.getOtherEventId(eventId));
+        }
+
+        List<UserInteraction> interactions = userInteractionRepository.findByUserIdAndEventIds(
+                userId, interactedEventIds);
+        Map<Long, Double> weights = new HashMap<>();
+        for (UserInteraction interaction : interactions) {
+            weights.put(interaction.getEventId(), interaction.getWeight());
+        }
+
         double weightedScoreSum = 0;
         double similaritySum = 0;
+
         for (EventSimilarity similarity : similarities) {
             long interactedEventId = similarity.getOtherEventId(eventId);
             Double weight = weights.get(interactedEventId);
+
             if (weight == null) {
                 throw new IllegalStateException("Interaction used for prediction was not found: eventId="
                         + interactedEventId + ", userId=" + userId);
@@ -96,9 +124,11 @@ public class RecommendationService {
             // Знаменатель: sum(similarity(A, B)).
             similaritySum += similarity.getScore();
         }
+
         if (similaritySum == 0) {
             throw new IllegalStateException("Cannot predict event " + eventId + ": sum of similarities is zero");
         }
+
         return weightedScoreSum / similaritySum;
     }
 }

@@ -1,7 +1,6 @@
 package ewm.stats.analyzer.repository;
 
 import ewm.stats.analyzer.model.EventSimilarity;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -89,8 +88,9 @@ public class EventSimilarityRepository {
                 .addValue("eventB", similarity.getEventB())
                 .addValue("score", similarity.getScore())
                 .addValue("calculationTime", Timestamp.from(similarity.getTimestamp()));
+
         if (jdbcTemplate.update(UPDATE_SQL, parameters) == 0) {
-            insertOrRetryUpdate(parameters);
+            jdbcTemplate.update(INSERT_SQL, parameters);
         }
     }
 
@@ -99,6 +99,7 @@ public class EventSimilarityRepository {
                 .addValue("eventId", eventId)
                 .addValue("userId", userId)
                 .addValue("limit", limit);
+
         return jdbcTemplate.query(FIND_NOT_INTERACTED_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
     }
 
@@ -106,10 +107,12 @@ public class EventSimilarityRepository {
         if (eventIds.isEmpty()) {
             return List.of();
         }
+
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("eventIds", eventIds)
                 .addValue("userId", userId)
                 .addValue("limit", limit);
+
         return jdbcTemplate.queryForList(FIND_RECOMMENDATION_CANDIDATES_SQL, parameters, Long.class);
     }
 
@@ -118,15 +121,8 @@ public class EventSimilarityRepository {
                 .addValue("eventId", eventId)
                 .addValue("userId", userId)
                 .addValue("limit", limit);
-        return jdbcTemplate.query(FIND_INTERACTED_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
-    }
 
-    private void insertOrRetryUpdate(MapSqlParameterSource parameters) {
-        try {
-            jdbcTemplate.update(INSERT_SQL, parameters);
-        } catch (DuplicateKeyException exception) {
-            jdbcTemplate.update(UPDATE_SQL, parameters);
-        }
+        return jdbcTemplate.query(FIND_INTERACTED_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
     }
 
     private static class EventSimilarityRowMapper implements RowMapper<EventSimilarity> {

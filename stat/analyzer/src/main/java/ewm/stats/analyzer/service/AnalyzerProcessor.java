@@ -56,6 +56,7 @@ public class AnalyzerProcessor {
         log.info("Starting analyzer: userActionsTopic={}, eventSimilaritiesTopic={}", userActionsTopic, eventSimilaritiesTopic);
         userActionConsumer.subscribe(List.of(userActionsTopic));
         eventSimilarityConsumer.subscribe(List.of(eventSimilaritiesTopic));
+
         try {
             while (running) {
                 processUserActions();
@@ -72,9 +73,11 @@ public class AnalyzerProcessor {
 
     private void processUserActions() {
         ConsumerRecords<Long, UserActionAvro> records = userActionConsumer.poll(pollTimeout);
+
         for (ConsumerRecord<Long, UserActionAvro> record : records) {
             userInteractionRepository.save(userInteractionMapper.toModel(record.value()));
         }
+
         if (!records.isEmpty()) {
             userActionConsumer.commitSync();
             log.debug("Saved and committed {} user actions", records.count());
@@ -83,9 +86,11 @@ public class AnalyzerProcessor {
 
     private void processEventSimilarities() {
         ConsumerRecords<String, EventSimilarityAvro> records = eventSimilarityConsumer.poll(pollTimeout);
+
         for (ConsumerRecord<String, EventSimilarityAvro> record : records) {
             eventSimilarityRepository.save(eventSimilarityMapper.toModel(record.value()));
         }
+
         if (!records.isEmpty()) {
             eventSimilarityConsumer.commitSync();
             log.debug("Saved and committed {} event similarities", records.count());
@@ -96,6 +101,7 @@ public class AnalyzerProcessor {
     public void stop() {
         log.info("Stopping analyzer processor");
         running = false;
+
         userActionConsumer.wakeup();
         eventSimilarityConsumer.wakeup();
     }

@@ -14,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,7 +46,7 @@ class RecommendationServiceTest {
     void shouldCalculateRecommendationUsingWeightedAverage() {
         when(userInteractionRepository.findRecentByUserId(USER_ID, 10)).thenReturn(List.of(interaction(10, 0.4)));
         when(eventSimilarityRepository.findRecommendationCandidateIds(
-                argThat(eventIds -> eventIds.equals(Set.of(10L))), eq(USER_ID), eq(10))).thenReturn(List.of(30L));
+                argThat(eventIds -> eventIds.equals(List.of(10L))), eq(USER_ID), eq(10))).thenReturn(List.of(30L));
         when(eventSimilarityRepository.findInteractedByEventId(30, USER_ID, 20)).thenReturn(List.of(
                 similarity(10, 30, 0.9),
                 similarity(20, 30, 0.3)
