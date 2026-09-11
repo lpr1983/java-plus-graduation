@@ -48,6 +48,7 @@ public class UserInteractionRepository {
             GROUP BY event_id
             """;
     private static final RowMapper<UserInteraction> ROW_MAPPER = new UserInteractionRowMapper();
+    private static final RowMapper<Map.Entry<Long, Double>> WEIGHT_SUM_ROW_MAPPER = new WeightSumRowMapper();
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -94,10 +95,11 @@ public class UserInteractionRepository {
 
         MapSqlParameterSource parameters = new MapSqlParameterSource("eventIds", eventIds);
         Map<Long, Double> weightSums = new LinkedHashMap<>();
-        List<Map.Entry<Long, Double>> rows = jdbcTemplate.query(SUM_WEIGHTS_SQL, parameters, (resultSet, rowNumber) ->
-                Map.entry(resultSet.getLong("event_id"), resultSet.getDouble("weight_sum")));
+        List<Map.Entry<Long, Double>> rows = jdbcTemplate.query(SUM_WEIGHTS_SQL, parameters, WEIGHT_SUM_ROW_MAPPER);
 
-        rows.forEach(row -> weightSums.put(row.getKey(), row.getValue()));
+        for (Map.Entry<Long, Double> row : rows) {
+            weightSums.put(row.getKey(), row.getValue());
+        }
 
         return weightSums;
     }
@@ -112,6 +114,14 @@ public class UserInteractionRepository {
                     resultSet.getDouble("weight"),
                     resultSet.getTimestamp("interaction_time").toInstant()
             );
+        }
+    }
+
+    private static class WeightSumRowMapper implements RowMapper<Map.Entry<Long, Double>> {
+
+        @Override
+        public Map.Entry<Long, Double> mapRow(ResultSet resultSet, int rowNumber) throws SQLException {
+            return Map.entry(resultSet.getLong("event_id"), resultSet.getDouble("weight_sum"));
         }
     }
 }
