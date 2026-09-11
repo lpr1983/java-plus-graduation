@@ -38,6 +38,8 @@ public class EventShortDto {
     @NotNull
     private Boolean paid;
 
+    private double rating;
+
     @NotBlank
     private String title;
 

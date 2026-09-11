@@ -1,5 +1,6 @@
 package ewm.main;
 
+import ewm.stats.client.AnalyzerClient;
 import ewm.stats.client.CollectorClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -9,7 +10,7 @@ import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
 @EnableFeignClients
-@Import(CollectorClient.class)
+@Import({AnalyzerClient.class, CollectorClient.class})
 @Slf4j
 public class EventServiceApplication {
 

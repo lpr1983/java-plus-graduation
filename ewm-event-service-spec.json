@@ -2735,6 +2735,7 @@
                   "name": "Фёдоров Матвей"
                 },
                 "paid": true,
+                "rating": 4.3,
                 "title": "Знаменитое шоу 'Летающая кукуруза'"
               },
               {
@@ -2751,6 +2752,7 @@
                   "name": "Паша Петров"
                 },
                 "paid": true,
+                "rating": 3.8,
                 "title": "Концерт рок-группы 'Java Core'"
               }
             ],
@@ -2785,6 +2787,7 @@
           "initiator",
           "location",
           "paid",
+          "rating",
           "title"
         ],
         "type": "object",
@@ -2853,6 +2856,12 @@
             "example": true,
             "default": true
           },
+          "rating": {
+            "type": "number",
+            "description": "Сумма максимальных весов взаимодействий пользователей с мероприятием",
+            "format": "double",
+            "example": 4.3
+          },
           "state": {
             "type": "string",
             "description": "Список состояний жизненного цикла события",
@@ -2900,6 +2909,7 @@
           "participantLimit": 10,
           "requestModeration": true,
           "confirmedRequests": 5,
+          "rating": 4.3,
           "state": "PUBLISHED"
         }
       },
@@ -2957,6 +2967,7 @@
           "eventDate",
           "initiator",
           "paid",
+          "rating",
           "title"
         ],
         "type": "object",
@@ -2994,6 +3005,12 @@
             "description": "Нужно ли оплачивать участие",
             "example": true
           },
+          "rating": {
+            "type": "number",
+            "description": "Сумма максимальных весов взаимодействий пользователей с мероприятием",
+            "format": "double",
+            "example": 4.3
+          },
           "title": {
             "type": "string",
             "description": "Заголовок",
@@ -3016,6 +3033,7 @@
               "name": "Фёдоров Матвей"
             },
             "paid": true,
+            "rating": 4.3,
             "title": "Знаменитое шоу 'Летающая кукуруза'"
           },
           {
@@ -3032,6 +3050,7 @@
               "name": "Паша Петров"
             },
             "paid": true,
+            "rating": 3.8,
             "title": "Концерт рок-группы 'Java Core'"
           }
         ]

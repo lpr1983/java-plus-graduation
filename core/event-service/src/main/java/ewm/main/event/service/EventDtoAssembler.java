@@ -13,6 +13,8 @@ import ewm.main.location.LocationClient;
 import ewm.main.location.PlaceMapper;
 import ewm.main.request.RequestClient;
 import ewm.main.user.UserClient;
+import ewm.stats.client.AnalyzerClient;
+import ewm.stats.client.model.RecommendedEvent;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -33,19 +35,23 @@ public class EventDtoAssembler {
     private final RequestClient requestClient;
     private final UserClient userClient;
     private final LocationClient locationClient;
+    private final AnalyzerClient analyzerClient;
 
     public EventDtoAssembler(RequestClient requestClient,
                              UserClient userClient,
-                             LocationClient locationClient) {
+                             LocationClient locationClient,
+                             AnalyzerClient analyzerClient) {
         this.requestClient = requestClient;
         this.userClient = userClient;
         this.locationClient = locationClient;
+        this.analyzerClient = analyzerClient;
     }
 
     public EventShortDto toShortDto(Event event) {
         EventShortDto dto = EventMapper.toShortDto(event, getInitiator(event, false));
 
         dto.setConfirmedRequests(getConfirmedRequests(event, false));
+        dto.setRating(getRating(event));
 
         return dto;
     }
@@ -66,6 +72,7 @@ public class EventDtoAssembler {
         );
 
         dto.setConfirmedRequests(getConfirmedRequests(event, allowUnavailableServices));
+        dto.setRating(getRating(event));
 
         return dto;
     }
@@ -82,12 +89,14 @@ public class EventDtoAssembler {
         Map<Long, Long> confirmedRequestsByEventId =
                 getConfirmedRequestsByEventId(events, allowUnavailableServices);
         Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
+        Map<Long, Double> ratingsByEventId = getRatingsByEventId(events);
 
         List<EventShortDto> result = new ArrayList<>();
 
         for (Event event : events) {
             EventShortDto dto = EventMapper.toShortDto(event, getInitiatorFromCache(event, initiatorsById));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
+            dto.setRating(getRatingForEvent(event, ratingsByEventId));
             result.add(dto);
         }
 
@@ -107,6 +116,7 @@ public class EventDtoAssembler {
                 getConfirmedRequestsByEventId(events, allowUnavailableServices);
         Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
         Map<Long, ShortPlaceDto> placesById = getPlacesById(events, allowUnavailableServices);
+        Map<Long, Double> ratingsByEventId = getRatingsByEventId(events);
 
         List<EventFullDto> result = new ArrayList<>();
 
@@ -117,6 +127,7 @@ public class EventDtoAssembler {
                     getPlaceFromCache(event, placesById)
             );
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
+            dto.setRating(getRatingForEvent(event, ratingsByEventId));
             result.add(dto);
         }
 
@@ -293,6 +304,29 @@ public class EventDtoAssembler {
         }
 
         return confirmedRequestsByEventId.getOrDefault(event.getId(), 0L);
+    }
+
+    private double getRating(Event event) {
+        return getRatingForEvent(event, getRatingsByEventId(List.of(event)));
+    }
+
+    private Map<Long, Double> getRatingsByEventId(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        List<RecommendedEvent> interactionCounts = analyzerClient.getInteractionsCount(getEventIds(events));
+        Map<Long, Double> result = new HashMap<>();
+
+        for (RecommendedEvent interactionCount : interactionCounts) {
+            result.put(interactionCount.eventId(), interactionCount.score());
+        }
+
+        return result;
+    }
+
+    private double getRatingForEvent(Event event, Map<Long, Double> ratingsByEventId) {
+        return ratingsByEventId.getOrDefault(event.getId(), 0.0);
     }
 
     private List<Long> getEventIds(List<Event> events) {

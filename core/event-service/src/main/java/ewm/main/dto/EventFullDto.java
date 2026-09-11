@@ -58,6 +58,8 @@ public class EventFullDto {
     @Builder.Default
     private Boolean requestModeration = true;
 
+    private double rating;
+
     private String state;
 
     @NotBlank
