@@ -12,13 +12,11 @@ import ewm.main.exception.ServiceUnavailableException;
 import ewm.main.location.LocationClient;
 import ewm.main.location.PlaceMapper;
 import ewm.main.request.RequestClient;
-import ewm.main.stat.StatService;
 import ewm.main.user.UserClient;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -29,20 +27,16 @@ import java.util.Set;
 @Component
 @Slf4j
 public class EventDtoAssembler {
-    private static final boolean UNIQUE_VIEWS = true;
     private static final String MISSING_USER_NAME = "Объект не найден";
     private static final String UNAVAILABLE_USER_NAME = "Данные временно недоступны";
 
-    private final StatService statService;
     private final RequestClient requestClient;
     private final UserClient userClient;
     private final LocationClient locationClient;
 
-    public EventDtoAssembler(StatService statService,
-                             RequestClient requestClient,
+    public EventDtoAssembler(RequestClient requestClient,
                              UserClient userClient,
                              LocationClient locationClient) {
-        this.statService = statService;
         this.requestClient = requestClient;
         this.userClient = userClient;
         this.locationClient = locationClient;
@@ -51,7 +45,6 @@ public class EventDtoAssembler {
     public EventShortDto toShortDto(Event event) {
         EventShortDto dto = EventMapper.toShortDto(event, getInitiator(event, false));
 
-        dto.setViews(getViews(event));
         dto.setConfirmedRequests(getConfirmedRequests(event, false));
 
         return dto;
@@ -72,7 +65,6 @@ public class EventDtoAssembler {
                 getPlace(event, allowUnavailableServices)
         );
 
-        dto.setViews(getViews(event));
         dto.setConfirmedRequests(getConfirmedRequests(event, allowUnavailableServices));
 
         return dto;
@@ -87,7 +79,6 @@ public class EventDtoAssembler {
     }
 
     private List<EventShortDto> toShortDtoList(List<Event> events, boolean allowUnavailableServices) {
-        Map<Long, Long> viewsByEventId = getViewsByEventId(events);
         Map<Long, Long> confirmedRequestsByEventId =
                 getConfirmedRequestsByEventId(events, allowUnavailableServices);
         Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
@@ -96,7 +87,6 @@ public class EventDtoAssembler {
 
         for (Event event : events) {
             EventShortDto dto = EventMapper.toShortDto(event, getInitiatorFromCache(event, initiatorsById));
-            dto.setViews(getViewsForEvent(event, viewsByEventId));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
             result.add(dto);
         }
@@ -113,7 +103,6 @@ public class EventDtoAssembler {
     }
 
     private List<EventFullDto> toFullDtoList(List<Event> events, boolean allowUnavailableServices) {
-        Map<Long, Long> viewsByEventId = getViewsByEventId(events);
         Map<Long, Long> confirmedRequestsByEventId =
                 getConfirmedRequestsByEventId(events, allowUnavailableServices);
         Map<Long, UserShortDto> initiatorsById = getInitiatorsById(events, allowUnavailableServices);
@@ -127,7 +116,6 @@ public class EventDtoAssembler {
                     getInitiatorFromCache(event, initiatorsById),
                     getPlaceFromCache(event, placesById)
             );
-            dto.setViews(getViewsForEvent(event, viewsByEventId));
             dto.setConfirmedRequests(getConfirmedRequestsForEvent(event, confirmedRequestsByEventId));
             result.add(dto);
         }
@@ -307,77 +295,6 @@ public class EventDtoAssembler {
         return confirmedRequestsByEventId.getOrDefault(event.getId(), 0L);
     }
 
-    private Long getViews(Event event) {
-        if (event.getPublishedOn() == null) {
-            return null;
-        }
-
-        String uri = getEventUri(event);
-
-        Map<String, Long> viewsByUri = statService.getViews(
-                event.getPublishedOn(),
-                LocalDateTime.now(),
-                List.of(uri),
-                UNIQUE_VIEWS
-        );
-
-        if (viewsByUri == null) {
-            return null;
-        }
-
-        return viewsByUri.getOrDefault(uri, 0L);
-    }
-
-    private Map<Long, Long> getViewsByEventId(List<Event> events) {
-        List<Event> eventsWithPublishedOn = getEventsWithPublishedOn(events);
-
-        if (eventsWithPublishedOn.isEmpty()) {
-            return Map.of();
-        }
-
-        Map<String, Long> viewsByUri = statService.getViews(
-                getMinPublishedOn(eventsWithPublishedOn),
-                LocalDateTime.now(),
-                getEventUris(eventsWithPublishedOn),
-                UNIQUE_VIEWS
-        );
-
-        if (viewsByUri == null) {
-            return null;
-        }
-
-        Map<Long, Long> viewsByEventId = new HashMap<>();
-
-        for (Event event : eventsWithPublishedOn) {
-            String uri = getEventUri(event);
-            Long views = viewsByUri.getOrDefault(uri, 0L);
-
-            viewsByEventId.put(event.getId(), views);
-        }
-
-        return viewsByEventId;
-    }
-
-    private Long getViewsForEvent(Event event, Map<Long, Long> viewsByEventId) {
-        if (viewsByEventId == null) {
-            return null;
-        }
-
-        return viewsByEventId.get(event.getId());
-    }
-
-    private List<Event> getEventsWithPublishedOn(List<Event> events) {
-        List<Event> result = new ArrayList<>();
-
-        for (Event event : events) {
-            if (event.getPublishedOn() != null) {
-                result.add(event);
-            }
-        }
-
-        return result;
-    }
-
     private List<Long> getEventIds(List<Event> events) {
         Set<Long> uniqueIds = new LinkedHashSet<>();
 
@@ -388,29 +305,4 @@ public class EventDtoAssembler {
         return new ArrayList<>(uniqueIds);
     }
 
-    private List<String> getEventUris(List<Event> events) {
-        Set<String> uniqueUris = new LinkedHashSet<>();
-
-        for (Event event : events) {
-            uniqueUris.add(getEventUri(event));
-        }
-
-        return new ArrayList<>(uniqueUris);
-    }
-
-    private LocalDateTime getMinPublishedOn(List<Event> events) {
-        LocalDateTime minPublishedOn = events.get(0).getPublishedOn();
-
-        for (Event event : events) {
-            if (event.getPublishedOn().isBefore(minPublishedOn)) {
-                minPublishedOn = event.getPublishedOn();
-            }
-        }
-
-        return minPublishedOn;
-    }
-
-    private String getEventUri(Event event) {
-        return "/events/" + event.getId();
-    }
 }

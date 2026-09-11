@@ -41,5 +41,4 @@ public class EventShortDto {
     @NotBlank
     private String title;
 
-    private Long views;
 }

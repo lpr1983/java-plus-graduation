@@ -9,10 +9,10 @@
 - Eureka Discovery Server для регистрации и обнаружения сервисов;
 - Spring Cloud Config Server для централизованного хранения настроек;
 - Spring Cloud Gateway на порту `8080` с маршрутами ко всему API `event-service`;
-- регистрация `event-service`, `stats-server`, Config Server и Gateway в Eureka;
+- регистрация прикладных сервисов, Config Server и Gateway в Eureka;
 - запуск прикладных сервисов и Config Server на динамических портах.
 
-`event-service` и `stats-server` получают внешние настройки через Config Server, обнаруживая его через Eureka. На этом этапе клиент статистики использовал общий интерфейс `DiscoveryClient`, а поиск экземпляра `stats-server` повторялся с помощью `RetryTemplate`. На втором этапе эта промежуточная реализация заменена на OpenFeign.
+Прикладные сервисы получают внешние настройки через Config Server, обнаруживая его через Eureka.
 
 Gateway использует маршруты вида `lb://event-service`: актуальный экземпляр сервиса событий выбирается через Eureka и Spring Cloud LoadBalancer.
 
@@ -30,7 +30,10 @@ java-plus-graduation
 │   ├── request-service     заявки на участие
 │   └── location-service    справочник мест
 ├── stat
-│   └── stats-server        сбор и выдача статистики просмотров
+│   ├── collector           приём действий пользователей
+│   ├── aggregator          расчёт сходства мероприятий
+│   ├── analyzer            расчёт рекомендаций
+│   └── stats-client        gRPC-клиенты рекомендательной системы
 └── infra
     ├── discovery-server    Eureka Server
     ├── config-server       централизованная конфигурация
@@ -43,11 +46,10 @@ java-plus-graduation
 - `user-service` — `ewm-users`;
 - `request-service` — `ewm-requests`;
 - `location-service` — `ewm-locations`;
-- `stats-server` — `ewm-stats`.
 
 Основные межсервисные зависимости:
 
-- `event-service` обращается к `user-service`, `request-service`, `location-service` и `stats-server`;
+- `event-service` обращается к `user-service`, `request-service`, `location-service` и сервисам рекомендаций;
 - `request-service` обращается к `user-service` и `event-service`;
 - `event-service` получает из `request-service` количество подтверждённых заявок, а `request-service` получает из `event-service` данные события, необходимые для обработки заявок.
 
@@ -84,14 +86,13 @@ java-plus-graduation
 | `event-service` | `GET /internal/events/{eventId}` | Данные события, необходимые для обработки заявок |
 | `request-service` | `GET /internal/requests/confirmed-counts?eventIds=...` | Число подтверждённых заявок по событиям |
 | `location-service` | `GET /internal/places/{placeId}`, `GET /internal/places?ids=...` | Данные одного или нескольких мест |
-| `stats-server` | `POST /hit`, `GET /stats` | Запись обращения и получение статистики |
 
 ### Отказоустойчивость Feign-клиентов
 
 В `event-service` и `request-service` используется Resilience4j Circuit Breaker со следующими настройками:
 
 - тайм-аут соединения — 1 секунда;
-- тайм-аут ответа — 2 секунды, для `stats-server` — 1 секунда;
+- тайм-аут ответа — 2 секунды;
 - окно — 10 вызовов, минимальное число вызовов для расчёта — 5;
 - порог ошибок — 50%;
 - в полуоткрытом состоянии разрешены 3 пробных вызова;
@@ -107,9 +108,8 @@ java-plus-graduation
 - если пользователь удалён и `user-service` вернул `404`, используется имя `Объект не найден`;
 - если `request-service` недоступен, `confirmedRequests` возвращается как `null`;
 - если `location-service` недоступен, дополнительное поле `place` возвращается как `null`; координаты события остаются доступны из БД `event-service`;
-- если `stats-server` недоступен, `views` возвращается как `null`, а ошибка записи посещения только логируется и не мешает основному запросу.
 
-Мягкая деградация применяется только к дополнительным данным ответного DTO. Если данные другого сервиса нужны для выполнения самой операции, например для поиска событий относительно `placeId`, запрос завершается с `503`. Изменяющие операции используют строгую сборку DTO и при недоступности бизнес-сервиса также возвращают `503`; статистика при этом всегда остаётся некритичной.
+Мягкая деградация применяется только к дополнительным данным ответного DTO. Если данные другого сервиса нужны для выполнения самой операции, например для поиска событий относительно `placeId`, запрос завершается с `503`. Изменяющие операции используют строгую сборку DTO и при недоступности бизнес-сервиса также возвращают `503`. Отправка просмотра в Collector является частью обработки `GET /events/{id}`.
 
 ### Ограничения межсервисной согласованности
 

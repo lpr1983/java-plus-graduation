@@ -23,7 +23,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -65,12 +64,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         PlaceInternalDto place = placeId == null ? null : findPlaceOrThrow(placeId);
         specification = specification.and(EventSpecifications.placeSearch(place, searchParam.getRadius()));
 
-        EventSort eventSort = EventSort.parse(searchParam.getSort());
-
-        if (eventSort == EventSort.VIEWS) {
-            return getEventsSortedByViews(specification, pageParam);
-        }
-
+        EventSort.parse(searchParam.getSort());
         return getEventsSortedByEventDate(specification, pageParam);
     }
 
@@ -87,29 +81,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         log.info("Найдено {} событий, соответствующих критериям.", events.size());
 
         return eventDtoAssembler.toShortDtoListForRead(events);
-    }
-
-    private List<EventShortDto> getEventsSortedByViews(Specification<Event> specification,
-                                                       PageParam pageParam) {
-        List<Event> events = eventRepository.findAll(specification);
-        log.info("Найдено {} событий для сортировки по просмотрам.", events.size());
-
-        List<EventShortDto> dtos = eventDtoAssembler.toShortDtoListForRead(events);
-
-        return dtos.stream()
-                .sorted(viewsComparator())
-                .skip(pageParam.getFrom())
-                .limit(pageParam.getSize())
-                .toList();
-    }
-
-    private Comparator<EventShortDto> viewsComparator() {
-        return Comparator
-                .comparing(
-                        EventShortDto::getViews,
-                        Comparator.nullsLast(Comparator.reverseOrder())
-                )
-                .thenComparing(EventShortDto::getId);
     }
 
     private PlaceInternalDto findPlaceOrThrow(long placeId) {
