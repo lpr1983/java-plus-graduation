@@ -13,7 +13,9 @@ import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.NotFoundException;
 import ewm.main.exception.ValidationException;
 import ewm.main.location.LocationClient;
+import ewm.main.request.RequestClient;
 import ewm.stats.client.AnalyzerClient;
+import ewm.stats.client.CollectorClient;
 import ewm.stats.client.model.RecommendedEvent;
 import feign.FeignException;
 import lombok.AllArgsConstructor;
@@ -37,6 +39,8 @@ public class PublicEventServiceImpl implements PublicEventService {
     private final EventDtoAssembler eventDtoAssembler;
     private final LocationClient locationClient;
     private final AnalyzerClient analyzerClient;
+    private final RequestClient requestClient;
+    private final CollectorClient collectorClient;
 
     @Override
     public List<EventShortDto> getEvents(PublicEventSearchParam searchParam, PageParam pageParam) {
@@ -121,6 +125,21 @@ public class PublicEventServiceImpl implements PublicEventService {
         log.info("Сформированы рекомендации для пользователя {}: запрошено {}, найдено событий {}",
                 userId, recommendations.size(), orderedEvents.size());
         return eventDtoAssembler.toShortDtoListForRead(orderedEvents);
+    }
+
+    @Override
+    public void likeEvent(long userId, long eventId) {
+        eventRepository.findOneByIdAndState(eventId, EventState.PUBLISHED)
+                .orElseThrow(() -> new NotFoundException(
+                        "Событие с id: " + eventId + " не найдено или недоступно"
+                ));
+
+        if (!requestClient.hasConfirmedParticipation(userId, eventId)) {
+            throw new ValidationException("Пользователь может лайкать только посещённые мероприятия");
+        }
+
+        collectorClient.sendLike(userId, eventId);
+        log.info("Пользователь {} поставил лайк мероприятию {}", userId, eventId);
     }
 
     @Override

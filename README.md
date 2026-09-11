@@ -50,7 +50,7 @@ java-plus-graduation
 Основные межсервисные зависимости:
 
 - `event-service` обращается к `user-service`, `request-service`, `location-service` и сервисам рекомендаций;
-- `request-service` обращается к `user-service` и `event-service`;
+- `request-service` обращается к `user-service`, `event-service` и Collector;
 - `event-service` получает из `request-service` количество подтверждённых заявок, а `request-service` получает из `event-service` данные события, необходимые для обработки заявок.
 
 ### Распределение внешнего API
@@ -85,6 +85,7 @@ java-plus-graduation
 | `user-service` | `GET /internal/users/{userId}`, `GET /internal/users?ids=...` | Краткие данные одного или нескольких пользователей |
 | `event-service` | `GET /internal/events/{eventId}` | Данные события, необходимые для обработки заявок |
 | `request-service` | `GET /internal/requests/confirmed-counts?eventIds=...` | Число подтверждённых заявок по событиям |
+| `request-service` | `GET /internal/requests/confirmed-participation?userId=...&eventId=...` | Проверка права пользователя поставить лайк |
 | `location-service` | `GET /internal/places/{placeId}`, `GET /internal/places?ids=...` | Данные одного или нескольких мест |
 
 ### Отказоустойчивость Feign-клиентов

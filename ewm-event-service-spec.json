@@ -1320,6 +1320,63 @@
         ]
       }
     },
+    "/events/{eventId}/like": {
+      "put": {
+        "description": "Лайк разрешён только пользователю с подтверждённой заявкой на участие в мероприятии",
+        "operationId": "likeEvent",
+        "parameters": [
+          {
+            "description": "id мероприятия",
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "description": "id пользователя, поставившего лайк",
+            "in": "header",
+            "name": "X-EWM-USER-ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Лайк отправлен"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Пользователь не является подтверждённым участником мероприятия"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Опубликованное мероприятие не найдено"
+          }
+        },
+        "summary": "Поставить лайк мероприятию",
+        "tags": [
+          "Public: События"
+        ]
+      }
+    },
     "/events/{id}": {
       "get": {
         "description": "Обратите внимание:\n- событие должно быть опубликовано\n- информация о событии должна включать количество подтвержденных запросов\n- просмотр события нужно отправить в Collector от имени пользователя из заголовка X-EWM-USER-ID\n\nВ случае, если события с заданным id не найдено, возвращает статус код 404",

@@ -13,6 +13,7 @@ import ewm.requestservice.request.model.ParticipationRequest;
 import ewm.requestservice.request.model.RequestStatus;
 import ewm.requestservice.request.repository.ParticipationRequestRepository;
 import ewm.requestservice.user.UserClient;
+import ewm.stats.client.CollectorClient;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     private final ParticipationRequestRepository requestRepository;
     private final UserClient userClient;
     private final EventClient eventClient;
+    private final CollectorClient collectorClient;
 
     @Override
     public List<ParticipationRequestDto> getRequests(long userId) {
@@ -84,6 +86,7 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
                 .build();
 
         ParticipationRequestDto result = ParticipationRequestMapper.toDto(requestRepository.save(request));
+        collectorClient.sendRegistration(userId, eventId);
         log.info("Request created with id: {}", result.getId());
         return result;
     }

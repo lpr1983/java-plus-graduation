@@ -33,6 +33,12 @@ public class PublicEventController {
         return publicEventService.getRecommendations(userId, maxResults);
     }
 
+    @PutMapping("/{eventId}/like")
+    public void likeEvent(@PathVariable long eventId,
+                          @RequestHeader("X-EWM-USER-ID") long userId) {
+        publicEventService.likeEvent(userId, eventId);
+    }
+
     @GetMapping("/{id}")
     public EventFullDto getEventById(@PathVariable Long id,
                                      @RequestHeader("X-EWM-USER-ID") long userId) {
