@@ -61,7 +61,10 @@ public class AnalyzerProcessor {
                 processUserActions();
                 processEventSimilarities();
             }
-        } catch (WakeupException ignored) {
+        } catch (WakeupException exception) {
+            if (running) {
+                throw exception;
+            }
         } finally {
             log.info("Analyzer processor stopped");
         }
