@@ -93,21 +93,28 @@ public class RecommendationService {
      * В расчёт входят K ближайших мероприятий B, с которыми взаимодействовал пользователь u.
      */
     private double predictScore(long eventId, long userId) {
+        // Получаем K мероприятий B, наиболее похожих на предсказываемое мероприятие A,
+        // с которыми пользователь u уже взаимодействовал.
         List<EventSimilarity> similarities = eventSimilarityRepository.findSimilaritiesForEventInteractedByUser(
                 eventId, userId, NEAREST_NEIGHBORS_LIMIT);
 
+        // Из каждой пары (A, B) извлекаем идентификатор соседнего мероприятия B.
         List<Long> interactedEventIds = new ArrayList<>();
         for (EventSimilarity similarity : similarities) {
             interactedEventIds.add(similarity.getOtherEventId(eventId));
         }
 
+        // Получаем веса w(u, B) взаимодействий пользователя с выбранными соседними мероприятиями.
         List<UserInteraction> interactions = userInteractionRepository.findByUserIdAndEventIds(
                 userId, interactedEventIds);
+
+        // Ключ — eventId мероприятия B, значение — вес w(u, B).
         Map<Long, Double> weights = new HashMap<>();
         for (UserInteraction interaction : interactions) {
             weights.put(interaction.getEventId(), interaction.getWeight());
         }
 
+        // Для каждого соседнего мероприятия накапливаем числитель и знаменатель формулы прогноза.
         double weightedScoreSum = 0;
         double similaritySum = 0;
 
@@ -125,10 +132,12 @@ public class RecommendationService {
             similaritySum += similarity.getScore();
         }
 
+        // При нулевой сумме коэффициентов подобия прогноз не определён.
         if (similaritySum == 0) {
             throw new IllegalStateException("Cannot predict event " + eventId + ": sum of similarities is zero");
         }
 
+        // R(u, A) = sum(similarity(A, B) * w(u, B)) / sum(similarity(A, B)).
         return weightedScoreSum / similaritySum;
     }
 }
