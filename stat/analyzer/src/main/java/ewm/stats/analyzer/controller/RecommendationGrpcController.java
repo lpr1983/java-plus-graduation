@@ -99,7 +99,7 @@ public class RecommendationGrpcController extends RecommendationsControllerGrpc.
         try {
             log.debug("Getting interaction counts for {} events", request.getEventIdCount());
 
-            List<RecommendedEvent> recommendations = recommendationService.getInteractionsCount(request.getEventIdList());
+            List<RecommendedEvent> recommendations = recommendationService.getInteractions(request.getEventIdList());
 
             for (RecommendedEvent recommendation : recommendations) {
                 responseObserver.onNext(recommendedEventMapper.toProto(recommendation));

@@ -64,7 +64,7 @@ public class RecommendationService {
             return List.of();
         }
 
-        List<EventSimilarity> similarities = eventSimilarityRepository.findNotInteractedByEventId(
+        List<EventSimilarity> similarities = eventSimilarityRepository.findSimilaritiesForEventNotInteractedByUser(
                 eventId, userId, maxResults);
 
         List<RecommendedEvent> recommendations = new ArrayList<>();
@@ -77,7 +77,7 @@ public class RecommendationService {
         return recommendations;
     }
 
-    public List<RecommendedEvent> getInteractionsCount(Collection<Long> eventIds) {
+    public List<RecommendedEvent> getInteractions(Collection<Long> eventIds) {
         Map<Long, Double> weightSums = userInteractionRepository.sumWeightsByEventIds(eventIds);
 
         return eventIds.stream()
@@ -93,7 +93,7 @@ public class RecommendationService {
      * В расчёт входят K ближайших мероприятий B, с которыми взаимодействовал пользователь u.
      */
     private double predictScore(long eventId, long userId) {
-        List<EventSimilarity> similarities = eventSimilarityRepository.findInteractedByEventId(
+        List<EventSimilarity> similarities = eventSimilarityRepository.findSimilaritiesForEventInteractedByUser(
                 eventId, userId, NEAREST_NEIGHBORS_LIMIT);
 
         List<Long> interactedEventIds = new ArrayList<>();

@@ -47,7 +47,7 @@ class RecommendationServiceTest {
         when(userInteractionRepository.findRecentByUserId(USER_ID, 10)).thenReturn(List.of(interaction(10, 0.4)));
         when(eventSimilarityRepository.findRecommendationCandidateIds(
                 argThat(eventIds -> eventIds.equals(List.of(10L))), eq(USER_ID), eq(10))).thenReturn(List.of(30L));
-        when(eventSimilarityRepository.findInteractedByEventId(30, USER_ID, 20)).thenReturn(List.of(
+        when(eventSimilarityRepository.findSimilaritiesForEventInteractedByUser(30, USER_ID, 20)).thenReturn(List.of(
                 similarity(10, 30, 0.9),
                 similarity(20, 30, 0.3)
         ));
@@ -61,12 +61,12 @@ class RecommendationServiceTest {
             assertThat(recommendation.getEventId()).isEqualTo(30);
             assertThat(recommendation.getScore()).isCloseTo(0.5, within(0.000001));
         });
-        verify(eventSimilarityRepository).findInteractedByEventId(30, USER_ID, 20);
+        verify(eventSimilarityRepository).findSimilaritiesForEventInteractedByUser(30, USER_ID, 20);
     }
 
     @Test
     void shouldReturnSimilarEventsNotInteractedByUser() {
-        when(eventSimilarityRepository.findNotInteractedByEventId(10, USER_ID, 2)).thenReturn(List.of(
+        when(eventSimilarityRepository.findSimilaritiesForEventNotInteractedByUser(10, USER_ID, 2)).thenReturn(List.of(
                 similarity(10, 30, 0.9),
                 similarity(5, 10, 0.7)
         ));
@@ -85,7 +85,7 @@ class RecommendationServiceTest {
         when(userInteractionRepository.sumWeightsByEventIds(List.of(30L, 10L, 40L)))
                 .thenReturn(Map.of(10L, 1.2, 30L, 2.4));
 
-        List<RecommendedEvent> result = recommendationService.getInteractionsCount(List.of(30L, 10L, 40L));
+        List<RecommendedEvent> result = recommendationService.getInteractions(List.of(30L, 10L, 40L));
 
         assertThat(result).extracting(RecommendedEvent::getEventId, RecommendedEvent::getScore)
                 .containsExactly(
@@ -108,7 +108,7 @@ class RecommendationServiceTest {
         when(userInteractionRepository.findRecentByUserId(USER_ID, 10)).thenReturn(List.of(interaction(10, 0.4)));
         when(eventSimilarityRepository.findRecommendationCandidateIds(
                 argThat(eventIds -> eventIds.contains(10L)), eq(USER_ID), eq(10))).thenReturn(List.of(30L));
-        when(eventSimilarityRepository.findInteractedByEventId(30, USER_ID, 20))
+        when(eventSimilarityRepository.findSimilaritiesForEventInteractedByUser(30, USER_ID, 20))
                 .thenReturn(List.of(similarity(10, 30, 0)));
         when(userInteractionRepository.findByUserIdAndEventIds(
                 eq(USER_ID), argThat(eventIds -> eventIds.contains(10L))))

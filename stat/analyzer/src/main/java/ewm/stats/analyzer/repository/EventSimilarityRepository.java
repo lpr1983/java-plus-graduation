@@ -94,7 +94,7 @@ public class EventSimilarityRepository {
         }
     }
 
-    public List<EventSimilarity> findNotInteractedByEventId(long eventId, long userId, int limit) {
+    public List<EventSimilarity> findSimilaritiesForEventNotInteractedByUser(long eventId, long userId, int limit) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("eventId", eventId)
                 .addValue("userId", userId)
@@ -116,7 +116,7 @@ public class EventSimilarityRepository {
         return jdbcTemplate.queryForList(FIND_RECOMMENDATION_CANDIDATES_SQL, parameters, Long.class);
     }
 
-    public List<EventSimilarity> findInteractedByEventId(long eventId, long userId, int limit) {
+    public List<EventSimilarity> findSimilaritiesForEventInteractedByUser(long eventId, long userId, int limit) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("eventId", eventId)
                 .addValue("userId", userId)

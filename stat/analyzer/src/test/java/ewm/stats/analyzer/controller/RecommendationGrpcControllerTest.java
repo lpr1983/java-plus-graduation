@@ -81,7 +81,7 @@ class RecommendationGrpcControllerTest {
         InteractionsCountRequestProto request = InteractionsCountRequestProto.newBuilder()
                 .addAllEventId(List.of(10L, 20L))
                 .build();
-        when(recommendationService.getInteractionsCount(List.of(10L, 20L)))
+        when(recommendationService.getInteractions(List.of(10L, 20L)))
                 .thenReturn(List.of(new RecommendedEvent(10, 2.4)));
 
         controller.getInteractionsCount(request, responseObserver);
