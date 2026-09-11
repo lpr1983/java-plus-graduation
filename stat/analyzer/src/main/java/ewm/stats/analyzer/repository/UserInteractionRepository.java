@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Collection;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -94,7 +94,7 @@ public class UserInteractionRepository {
         }
 
         MapSqlParameterSource parameters = new MapSqlParameterSource("eventIds", eventIds);
-        Map<Long, Double> weightSums = new LinkedHashMap<>();
+        Map<Long, Double> weightSums = new HashMap<>();
         List<Map.Entry<Long, Double>> rows = jdbcTemplate.query(SUM_WEIGHTS_SQL, parameters, WEIGHT_SUM_ROW_MAPPER);
 
         for (Map.Entry<Long, Double> row : rows) {

@@ -80,7 +80,7 @@ public class AggregationProcessor {
     }
 
     private void publishAndAwaitCompletion(List<EventSimilarityAvro> similarities) {
-        List<Future<RecordMetadata>> sendResults = new ArrayList<>(similarities.size());
+        List<Future<RecordMetadata>> sendResults = new ArrayList<>();
         for (EventSimilarityAvro similarity : similarities) {
             String key = similarity.getEventA() + ":" + similarity.getEventB();
             ProducerRecord<String, SpecificRecordBase> record = new ProducerRecord<>(eventsSimilarityTopic, key, similarity);
