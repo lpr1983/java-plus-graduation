@@ -1261,6 +1261,65 @@
         ]
       }
     },
+    "/events/recommendations": {
+      "get": {
+        "description": "Возвращает персональные рекомендации опубликованных мероприятий",
+        "operationId": "getRecommendations",
+        "parameters": [
+          {
+            "description": "id пользователя, для которого формируются рекомендации",
+            "in": "header",
+            "name": "X-EWM-USER-ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "description": "Максимальное количество рекомендаций",
+            "in": "query",
+            "name": "maxResults",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventShortDto"
+                  }
+                }
+              }
+            },
+            "description": "Рекомендации сформированы"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Некорректное значение maxResults"
+          }
+        },
+        "summary": "Получение рекомендаций мероприятий для пользователя",
+        "tags": [
+          "Public: События"
+        ]
+      }
+    },
     "/events/{id}": {
       "get": {
         "description": "Обратите внимание:\n- событие должно быть опубликовано\n- информация о событии должна включать количество подтвержденных запросов\n- просмотр события нужно отправить в Collector от имени пользователя из заголовка X-EWM-USER-ID\n\nВ случае, если события с заданным id не найдено, возвращает статус код 404",

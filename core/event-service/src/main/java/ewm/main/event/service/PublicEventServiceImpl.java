@@ -13,6 +13,8 @@ import ewm.main.event.repository.EventSpecifications;
 import ewm.main.exception.NotFoundException;
 import ewm.main.exception.ValidationException;
 import ewm.main.location.LocationClient;
+import ewm.stats.client.AnalyzerClient;
+import ewm.stats.client.model.RecommendedEvent;
 import feign.FeignException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +25,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -32,6 +36,7 @@ public class PublicEventServiceImpl implements PublicEventService {
     private final EventRepository eventRepository;
     private final EventDtoAssembler eventDtoAssembler;
     private final LocationClient locationClient;
+    private final AnalyzerClient analyzerClient;
 
     @Override
     public List<EventShortDto> getEvents(PublicEventSearchParam searchParam, PageParam pageParam) {
@@ -89,6 +94,33 @@ public class PublicEventServiceImpl implements PublicEventService {
         } catch (FeignException.NotFound exception) {
             throw new NotFoundException("Не найдено место с id: " + placeId);
         }
+    }
+
+    @Override
+    public List<EventShortDto> getRecommendations(long userId, int maxResults) {
+        if (maxResults <= 0) {
+            throw new ValidationException("maxResults должен быть положительным");
+        }
+
+        List<RecommendedEvent> recommendations = analyzerClient.getRecommendationsForUser(userId, maxResults);
+        List<Long> eventIds = recommendations.stream().map(RecommendedEvent::eventId).toList();
+
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Event> events = eventRepository.findAllByIdInAndState(eventIds, EventState.PUBLISHED);
+        Map<Long, Event> eventsById = new HashMap<>();
+        events.forEach(event -> eventsById.put(event.getId(), event));
+
+        List<Event> orderedEvents = eventIds.stream()
+                .map(eventsById::get)
+                .filter(event -> event != null)
+                .toList();
+
+        log.info("Сформированы рекомендации для пользователя {}: запрошено {}, найдено событий {}",
+                userId, recommendations.size(), orderedEvents.size());
+        return eventDtoAssembler.toShortDtoListForRead(orderedEvents);
     }
 
     @Override

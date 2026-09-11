@@ -27,6 +27,12 @@ public class PublicEventController {
         return publicEventService.getEvents(searchParam, pageParam);
     }
 
+    @GetMapping("/recommendations")
+    public List<EventShortDto> getRecommendations(@RequestHeader("X-EWM-USER-ID") long userId,
+                                                   @RequestParam(defaultValue = "10") int maxResults) {
+        return publicEventService.getRecommendations(userId, maxResults);
+    }
+
     @GetMapping("/{id}")
     public EventFullDto getEventById(@PathVariable Long id,
                                      @RequestHeader("X-EWM-USER-ID") long userId) {
