@@ -28,17 +28,50 @@ public class EventSimilarityRepository {
                 END
             WHERE event_a = :eventA AND event_b = :eventB
             """;
-    private static final String FIND_BY_EVENT_ID_SQL = """
+    private static final String FIND_NOT_INTERACTED_BY_EVENT_ID_SQL = """
             SELECT event_a, event_b, score, calculation_time
-            FROM event_similarities
-            WHERE event_a = :eventId OR event_b = :eventId
+            FROM event_similarities es
+            WHERE (event_a = :eventId OR event_b = :eventId)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM user_interactions ui
+                  WHERE ui.user_id = :userId
+                    AND ui.event_id = CASE WHEN es.event_a = :eventId THEN es.event_b ELSE es.event_a END
+              )
             ORDER BY score DESC, event_a, event_b
             LIMIT :limit
             """;
-    private static final String FIND_BY_EVENT_IDS_SQL = """
+    private static final String FIND_RECOMMENDATION_CANDIDATES_SQL = """
+            WITH candidates AS (
+                SELECT event_b AS event_id, score
+                FROM event_similarities
+                WHERE event_a IN (:eventIds) AND event_b NOT IN (:eventIds)
+                UNION ALL
+                SELECT event_a AS event_id, score
+                FROM event_similarities
+                WHERE event_b IN (:eventIds) AND event_a NOT IN (:eventIds)
+            )
+            SELECT candidate.event_id
+            FROM candidates candidate
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM user_interactions ui
+                WHERE ui.user_id = :userId AND ui.event_id = candidate.event_id
+            )
+            GROUP BY candidate.event_id
+            ORDER BY MAX(candidate.score) DESC, candidate.event_id
+            LIMIT :limit
+            """;
+    private static final String FIND_INTERACTED_BY_EVENT_ID_SQL = """
             SELECT event_a, event_b, score, calculation_time
-            FROM event_similarities
-            WHERE event_a IN (:eventIds) OR event_b IN (:eventIds)
+            FROM event_similarities es
+            WHERE (event_a = :eventId OR event_b = :eventId)
+              AND EXISTS (
+                  SELECT 1
+                  FROM user_interactions ui
+                  WHERE ui.user_id = :userId
+                    AND ui.event_id = CASE WHEN es.event_a = :eventId THEN es.event_b ELSE es.event_a END
+              )
             ORDER BY score DESC, event_a, event_b
             LIMIT :limit
             """;
@@ -61,21 +94,31 @@ public class EventSimilarityRepository {
         }
     }
 
-    public List<EventSimilarity> findByEventId(long eventId, int limit) {
+    public List<EventSimilarity> findNotInteractedByEventId(long eventId, long userId, int limit) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("eventId", eventId)
+                .addValue("userId", userId)
                 .addValue("limit", limit);
-        return jdbcTemplate.query(FIND_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
+        return jdbcTemplate.query(FIND_NOT_INTERACTED_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
     }
 
-    public List<EventSimilarity> findByEventIds(Collection<Long> eventIds, int limit) {
+    public List<Long> findRecommendationCandidateIds(Collection<Long> eventIds, long userId, int limit) {
         if (eventIds.isEmpty()) {
             return List.of();
         }
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("eventIds", eventIds)
+                .addValue("userId", userId)
                 .addValue("limit", limit);
-        return jdbcTemplate.query(FIND_BY_EVENT_IDS_SQL, parameters, ROW_MAPPER);
+        return jdbcTemplate.queryForList(FIND_RECOMMENDATION_CANDIDATES_SQL, parameters, Long.class);
+    }
+
+    public List<EventSimilarity> findInteractedByEventId(long eventId, long userId, int limit) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("eventId", eventId)
+                .addValue("userId", userId)
+                .addValue("limit", limit);
+        return jdbcTemplate.query(FIND_INTERACTED_BY_EVENT_ID_SQL, parameters, ROW_MAPPER);
     }
 
     private void insertOrRetryUpdate(MapSqlParameterSource parameters) {
